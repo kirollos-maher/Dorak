@@ -11,10 +11,6 @@
 <style>
 /* ============================================================
    DESIGN SYSTEM — "Console" identity
-   Deep neutral charcoal base, signal-amber for action, teal for
-   live/active state, monospace for every number (timers, prices,
-   codes) to read like an operations console rather than a
-   generic consumer app.
    ============================================================ */
 :root {
     --bg: #0c0f12;
@@ -34,6 +30,10 @@
     --red: #ef4444;
     --red-dim: #3d1616;
     --blue: #4f9dff;
+    --green: #22c55e;
+    --green-dim: #14532d;
+    --purple: #a855f7;
+    --purple-dim: #4c1d95;
 
     --radius-sm: 8px;
     --radius-md: 12px;
@@ -102,6 +102,8 @@ button:focus-visible, a:focus-visible, input:focus-visible, select:focus-visible
 .btn-ghost { background: transparent; border: 1px solid var(--border-strong); color: var(--text); }
 .btn-ghost:hover { background: var(--surface); }
 .btn-sm { padding: 8px 14px; font-size: 13px; }
+.btn-danger-sm { background: var(--red); color: #fff; padding: 6px 12px; font-size: 12px; border-radius: var(--radius-sm); border: none; cursor: pointer; }
+.btn-danger-sm:hover { opacity: 0.8; }
 
 .error-text { color: var(--red); font-size: 13px; margin-top: 10px; min-height: 16px; }
 
@@ -112,7 +114,7 @@ button:focus-visible, a:focus-visible, input:focus-visible, select:focus-visible
 }
 .app-header .biz-name { font-weight: 800; font-size: 16px; }
 .app-header .biz-sub { font-size: 11px; color: var(--text-dim); font-family: var(--font-mono); }
-.header-actions { display: flex; gap: 8px; }
+.header-actions { display: flex; gap: 8px; align-items: center; }
 .icon-btn { width: 38px; height: 38px; border-radius: var(--radius-sm); background: var(--surface); border: 1px solid var(--border); color: var(--text-dim); display: flex; align-items: center; justify-content: center; cursor: pointer; }
 .icon-btn:hover { color: var(--text); border-color: var(--border-strong); }
 
@@ -157,7 +159,7 @@ button:focus-visible, a:focus-visible, input:focus-visible, select:focus-visible
 .list-row .row-title { font-weight: 600; font-size: 14.5px; }
 .list-row .row-sub { font-size: 12px; color: var(--text-dim); margin-top: 2px; }
 .list-row .row-value { font-family: var(--font-mono); font-weight: 700; }
-.list-row.low-stock .row-title { color: var(--red); }
+.list-row .row-actions { display: flex; gap: 6px; align-items: center; }
 
 .panel { background: var(--surface); border: 1px solid var(--border); border-radius: var(--radius-md); padding: 6px 14px; }
 
@@ -166,6 +168,8 @@ button:focus-visible, a:focus-visible, input:focus-visible, select:focus-visible
 .badge-teal { background: var(--teal-dim); color: var(--teal); }
 .badge-red { background: var(--red-dim); color: #ff8f8f; }
 .badge-amber { background: var(--amber-dim); color: var(--amber); }
+.badge-green { background: var(--green-dim); color: var(--green); }
+.badge-purple { background: var(--purple-dim); color: var(--purple); }
 
 /* ---------- FAB ---------- */
 .fab { position: fixed; bottom: 96px; left: 16px; width: 52px; height: 52px; border-radius: 50%; background: var(--amber); color: var(--bg); border: none; font-size: 20px; box-shadow: 0 8px 22px rgba(255,138,30,0.4); z-index: 60; display: flex; align-items: center; justify-content: center; cursor: pointer; }
@@ -186,6 +190,32 @@ button:focus-visible, a:focus-visible, input:focus-visible, select:focus-visible
 .sheet-title { font-size: 17px; font-weight: 800; margin-bottom: 16px; display: flex; align-items: center; justify-content: space-between; }
 .sheet-title .close-x { color: var(--text-dim); background: none; border: none; font-size: 18px; cursor: pointer; }
 
+/* ---------- payment method selector ---------- */
+.payment-options {
+    display: grid;
+    grid-template-columns: repeat(2, 1fr);
+    gap: 8px;
+    margin: 12px 0;
+}
+.payment-option {
+    background: var(--bg-sunken);
+    border: 2px solid var(--border);
+    border-radius: var(--radius-sm);
+    padding: 14px 8px;
+    text-align: center;
+    cursor: pointer;
+    transition: all 0.2s var(--ease);
+    font-weight: 600;
+    font-size: 13px;
+}
+.payment-option i { font-size: 22px; display: block; margin-bottom: 4px; }
+.payment-option.selected {
+    border-color: var(--amber);
+    background: var(--amber-dim);
+    color: var(--amber);
+}
+.payment-option:hover { border-color: var(--border-strong); }
+
 /* ---------- toast ---------- */
 .toast { position: fixed; bottom: 100px; left: 16px; right: 16px; max-width: 480px; margin: 0 auto; padding: 14px 18px; border-radius: var(--radius-sm); font-weight: 700; font-size: 13.5px; text-align: center; z-index: 999; display: none; color: #fff; animation: sheetUp 0.25s var(--ease); }
 .toast.success { background: #16825a; }
@@ -196,7 +226,7 @@ button:focus-visible, a:focus-visible, input:focus-visible, select:focus-visible
 .empty { text-align: center; padding: 34px 16px; color: var(--text-dim); }
 .empty i { font-size: 26px; color: var(--text-faint); margin-bottom: 10px; display: block; }
 
-/* ---------- print (PDF export view) ---------- */
+/* ---------- print ---------- */
 @media print {
     body * { visibility: hidden; }
     #printArea, #printArea * { visibility: visible; }
@@ -205,6 +235,25 @@ button:focus-visible, a:focus-visible, input:focus-visible, select:focus-visible
 
 @media (min-width: 700px) {
     .stat-grid, .station-grid { grid-template-columns: repeat(3, 1fr); }
+    .payment-options { grid-template-columns: repeat(3, 1fr); }
+}
+
+/* ---------- language toggle ---------- */
+.lang-toggle {
+    background: var(--surface);
+    border: 1px solid var(--border);
+    border-radius: var(--radius-sm);
+    color: var(--text);
+    padding: 6px 12px;
+    font-size: 12px;
+    font-weight: 700;
+    cursor: pointer;
+    display: flex;
+    align-items: center;
+    gap: 6px;
+}
+.lang-toggle:hover {
+    border-color: var(--border-strong);
 }
 </style>
 </head>
@@ -214,18 +263,18 @@ button:focus-visible, a:focus-visible, input:focus-visible, select:focus-visible
 <div id="setupScreen" class="screen active">
     <div class="centered-screen">
         <div class="brand-mark">PS RENTAL PRO</div>
-        <div class="brand-title">تسجيل الدخول للنشاط</div>
+        <div class="brand-title" data-ar="تسجيل الدخول للنشاط" data-en="Business Login">تسجيل الدخول للنشاط</div>
         <div class="card">
             <div class="field">
-                <label>كود النشاط التجاري</label>
+                <label data-ar="كود النشاط التجاري" data-en="Business Code">كود النشاط التجاري</label>
                 <input type="text" id="setupBusinessCode" class="mono" placeholder="مثال: CAFE01" style="text-transform:uppercase">
             </div>
             <div class="field">
-                <label>اسم هذا الجهاز</label>
+                <label data-ar="اسم هذا الجهاز" data-en="Device Name">اسم هذا الجهاز</label>
                 <input type="text" id="setupDeviceLabel" placeholder="مثال: تابلت الكاونتر">
             </div>
             <button class="btn btn-amber btn-block" id="setupContinueBtn" onclick="handleSetupContinue()">
-                <i class="fa-solid fa-arrow-left"></i> متابعة
+                <i class="fa-solid fa-arrow-left"></i> <span data-ar="متابعة" data-en="Continue">متابعة</span>
             </button>
             <div class="error-text" id="setupError"></div>
         </div>
@@ -238,17 +287,17 @@ button:focus-visible, a:focus-visible, input:focus-visible, select:focus-visible
         <div class="brand-mark">تفعيل الجهاز</div>
         <div class="brand-title" id="activationBizName">—</div>
         <div class="card">
-            <p style="color:var(--text-dim);font-size:13px;margin-bottom:16px;">
+            <p style="color:var(--text-dim);font-size:13px;margin-bottom:16px;" data-ar="الجهاز ده لسه مش مفعّل على النشاط ده. أدخل كود التفعيل اللي معاك." data-en="This device is not activated for this business. Enter the activation code you have.">
                 الجهاز ده لسه مش مفعّل على النشاط ده. أدخل كود التفعيل اللي معاك.
             </p>
             <div class="field">
-                <label>كود التفعيل</label>
+                <label data-ar="كود التفعيل" data-en="Activation Code">كود التفعيل</label>
                 <input type="text" id="activationCodeInput" class="mono" placeholder="XXXX-XXXX" style="text-transform:uppercase">
             </div>
             <button class="btn btn-amber btn-block" onclick="handleActivateDevice()">
-                <i class="fa-solid fa-check"></i> تفعيل
+                <i class="fa-solid fa-check"></i> <span data-ar="تفعيل" data-en="Activate">تفعيل</span>
             </button>
-            <button class="btn btn-ghost btn-block" style="margin-top:8px;" onclick="showScreen('setupScreen')">رجوع</button>
+            <button class="btn btn-ghost btn-block" style="margin-top:8px;" onclick="showScreen('setupScreen')"><span data-ar="رجوع" data-en="Back">رجوع</span></button>
             <div class="error-text" id="activationError"></div>
         </div>
     </div>
@@ -261,11 +310,11 @@ button:focus-visible, a:focus-visible, input:focus-visible, select:focus-visible
         <div class="brand-title" id="lockBizName">—</div>
         <div class="card">
             <div class="field">
-                <label>PIN المالك أو الموظف</label>
+                <label data-ar="PIN المالك أو الموظف" data-en="Owner or Employee PIN">PIN المالك أو الموظف</label>
                 <input type="password" inputmode="numeric" id="lockPinInput" class="mono" placeholder="••••" style="text-align:center;letter-spacing:0.4em;font-size:22px;">
             </div>
             <button class="btn btn-amber btn-block" onclick="handleUnlock()">
-                <i class="fa-solid fa-unlock"></i> دخول
+                <i class="fa-solid fa-unlock"></i> <span data-ar="دخول" data-en="Enter">دخول</span>
             </button>
             <div class="error-text" id="lockError"></div>
         </div>
@@ -281,6 +330,9 @@ button:focus-visible, a:focus-visible, input:focus-visible, select:focus-visible
             <div class="biz-sub mono" id="headerBizCode">—</div>
         </div>
         <div class="header-actions">
+            <button class="lang-toggle" onclick="toggleLanguage()">
+                <i class="fa-solid fa-language"></i> <span id="langToggleLabel">English</span>
+            </button>
             <div class="icon-btn" title="متصل لحظيًا"><span class="live-dot"></span></div>
             <button class="icon-btn" onclick="lockApp()"><i class="fa-solid fa-lock"></i></button>
         </div>
@@ -288,65 +340,64 @@ button:focus-visible, a:focus-visible, input:focus-visible, select:focus-visible
 
     <!-- ---------- DASHBOARD ---------- -->
     <div class="view active" id="view-dashboard">
-        <div class="section-title">أداء اليوم</div>
+        <div class="section-title" data-ar="أداء اليوم" data-en="Today's Performance">أداء اليوم</div>
         <div class="stat-grid">
-            <div class="stat-card accent"><div class="stat-label">إيراد اليوم</div><div class="stat-value mono" id="dashRevenue">0</div></div>
-            <div class="stat-card"><div class="stat-label">مصروفات اليوم</div><div class="stat-value mono" id="dashExpenses">0</div></div>
-            <div class="stat-card"><div class="stat-label">أجهزة شغالة</div><div class="stat-value mono" id="dashActive">0</div></div>
-            <div class="stat-card"><div class="stat-label">أجهزة متاحة</div><div class="stat-value mono" id="dashAvailable">0</div></div>
+            <div class="stat-card accent"><div class="stat-label" data-ar="إيراد اليوم" data-en="Today's Revenue">إيراد اليوم</div><div class="stat-value mono" id="dashRevenue">0</div></div>
+            <div class="stat-card"><div class="stat-label" data-ar="مصروفات اليوم" data-en="Today's Expenses">مصروفات اليوم</div><div class="stat-value mono" id="dashExpenses">0</div></div>
+            <div class="stat-card"><div class="stat-label" data-ar="أجهزة شغالة" data-en="Active Devices">أجهزة شغالة</div><div class="stat-value mono" id="dashActive">0</div></div>
+            <div class="stat-card"><div class="stat-label" data-ar="أجهزة متاحة" data-en="Available Devices">أجهزة متاحة</div><div class="stat-value mono" id="dashAvailable">0</div></div>
         </div>
-        <div class="section-title">تنبيهات المخزون</div>
-        <div class="panel" id="dashInventoryAlerts"></div>
     </div>
 
     <!-- ---------- STATIONS ---------- -->
     <div class="view" id="view-stations">
-        <div class="section-title">الأجهزة</div>
+        <div class="section-title" data-ar="الأجهزة" data-en="Devices">الأجهزة</div>
         <div class="station-grid" id="stationsGrid"></div>
-    </div>
-
-    <!-- ---------- INVENTORY ---------- -->
-    <div class="view" id="view-inventory">
-        <div class="section-title">المخزون</div>
-        <div class="panel" id="inventoryList"></div>
     </div>
 
     <!-- ---------- SHIFT ---------- -->
     <div class="view" id="view-shift">
-        <div class="section-title">الشيفت الحالي</div>
+        <div class="section-title" data-ar="الشيفت الحالي" data-en="Current Shift">الشيفت الحالي</div>
         <div class="panel" id="shiftSummary"></div>
         <button class="btn btn-red btn-block" style="margin-top:14px;" onclick="openCloseShiftSheet()">
-            <i class="fa-solid fa-lock"></i> إقفال الشيفت
+            <i class="fa-solid fa-lock"></i> <span data-ar="إقفال الشيفت" data-en="Close Shift">إقفال الشيفت</span>
         </button>
-        <div class="section-title">سجل الشيفتات</div>
+        <div class="section-title" data-ar="سجل الشيفتات" data-en="Shift History">سجل الشيفتات</div>
         <div class="panel" id="shiftHistory"></div>
     </div>
 
     <!-- ---------- SETTINGS ---------- -->
     <div class="view" id="view-settings">
-        <div class="section-title">الاشتراك</div>
+        <div class="section-title" data-ar="الأجهزة" data-en="Devices">الأجهزة</div>
+        <div class="panel" id="settingsStations"></div>
+        <button class="btn btn-ghost btn-block" style="margin-top:8px;" onclick="openStationManagementSheet()"><i class="fa-solid fa-plus"></i> <span data-ar="إضافة جهاز" data-en="Add Device">إضافة جهاز</span></button>
+
+        <div class="section-title" data-ar="طرق الدفع" data-en="Payment Methods">طرق الدفع</div>
+        <div class="panel" id="settingsPaymentMethods"></div>
+        <button class="btn btn-ghost btn-block" style="margin-top:8px;" onclick="openPaymentMethodSheet()"><i class="fa-solid fa-plus"></i> <span data-ar="إضافة طريقة دفع" data-en="Add Payment Method">إضافة طريقة دفع</span></button>
+
+        <div class="section-title" data-ar="الاشتراك" data-en="Subscription">الاشتراك</div>
         <div class="panel" id="settingsSubscription"></div>
 
-        <div class="section-title">قائمة الأكل والمشروبات</div>
+        <div class="section-title" data-ar="قائمة الأكل والمشروبات" data-en="Food & Drinks Menu">قائمة الأكل والمشروبات</div>
         <div class="panel" id="settingsMenu"></div>
-        <button class="btn btn-ghost btn-block" style="margin-top:8px;" onclick="openMenuItemSheet()"><i class="fa-solid fa-plus"></i> إضافة صنف</button>
+        <button class="btn btn-ghost btn-block" style="margin-top:8px;" onclick="openMenuItemSheet()"><i class="fa-solid fa-plus"></i> <span data-ar="إضافة صنف" data-en="Add Item">إضافة صنف</span></button>
 
-        <div class="section-title">الموظفين</div>
+        <div class="section-title" data-ar="الموظفين" data-en="Employees">الموظفين</div>
         <div class="panel" id="settingsEmployees"></div>
-        <button class="btn btn-ghost btn-block" style="margin-top:8px;" onclick="openEmployeeSheet()"><i class="fa-solid fa-plus"></i> إضافة موظف</button>
+        <button class="btn btn-ghost btn-block" style="margin-top:8px;" onclick="openEmployeeSheet()"><i class="fa-solid fa-plus"></i> <span data-ar="إضافة موظف" data-en="Add Employee">إضافة موظف</span></button>
 
-        <div class="section-title">النشاط</div>
-        <button class="btn btn-ghost btn-block" onclick="switchBusiness()"><i class="fa-solid fa-right-left"></i> تبديل النشاط</button>
+        <div class="section-title" data-ar="النشاط" data-en="Business">النشاط</div>
+        <button class="btn btn-ghost btn-block" onclick="switchBusiness()"><i class="fa-solid fa-right-left"></i> <span data-ar="تبديل النشاط" data-en="Switch Business">تبديل النشاط</span></button>
     </div>
 
     <div class="fab" id="fabAddExpense" onclick="openExpenseSheet()"><i class="fa-solid fa-plus"></i></div>
 
     <div class="bottom-nav">
-        <button class="nav-btn active" data-view="view-dashboard" onclick="navigateTo('view-dashboard')"><i class="fa-solid fa-gauge-high"></i>الرئيسية</button>
-        <button class="nav-btn" data-view="view-stations" onclick="navigateTo('view-stations')"><i class="fa-solid fa-gamepad"></i>الأجهزة</button>
-        <button class="nav-btn" data-view="view-inventory" onclick="navigateTo('view-inventory')"><i class="fa-solid fa-boxes-stacked"></i>المخزون</button>
-        <button class="nav-btn" data-view="view-shift" onclick="navigateTo('view-shift')"><i class="fa-solid fa-cash-register"></i>الشيفت</button>
-        <button class="nav-btn" data-view="view-settings" onclick="navigateTo('view-settings')"><i class="fa-solid fa-gear"></i>الإعدادات</button>
+        <button class="nav-btn active" data-view="view-dashboard" onclick="navigateTo('view-dashboard')"><i class="fa-solid fa-gauge-high"></i><span data-ar="الرئيسية" data-en="Home">الرئيسية</span></button>
+        <button class="nav-btn" data-view="view-stations" onclick="navigateTo('view-stations')"><i class="fa-solid fa-gamepad"></i><span data-ar="الأجهزة" data-en="Devices">الأجهزة</span></button>
+        <button class="nav-btn" data-view="view-shift" onclick="navigateTo('view-shift')"><i class="fa-solid fa-cash-register"></i><span data-ar="الشيفت" data-en="Shift">الشيفت</span></button>
+        <button class="nav-btn" data-view="view-settings" onclick="navigateTo('view-settings')"><i class="fa-solid fa-gear"></i><span data-ar="الإعدادات" data-en="Settings">الإعدادات</span></button>
     </div>
 </div>
 
@@ -359,29 +410,83 @@ button:focus-visible, a:focus-visible, input:focus-visible, select:focus-visible
     </div>
 </div>
 
+<!-- ============== STATION MANAGEMENT SHEET ============== -->
+<div class="overlay" id="stationManagementOverlay">
+    <div class="sheet">
+        <div class="sheet-handle"></div>
+        <div class="sheet-title"><span id="stationManagementTitle" data-ar="إدارة الجهاز" data-en="Manage Device">إدارة الجهاز</span><button class="close-x" onclick="closeSheet('stationManagementOverlay')"><i class="fa-solid fa-xmark"></i></button></div>
+        <input type="hidden" id="stationManageId">
+        <div class="field">
+            <label data-ar="رقم الجهاز" data-en="Device Number">رقم الجهاز</label>
+            <input type="number" id="stationManageNumber" class="mono" min="1">
+        </div>
+        <div class="field">
+            <label data-ar="الاسم (اختياري)" data-en="Name (optional)">الاسم (اختياري)</label>
+            <input type="text" id="stationManageName" placeholder="مثال: بلايستيشن 5">
+        </div>
+        <div class="field">
+            <label data-ar="السعر بالساعة" data-en="Hourly Rate">السعر بالساعة</label>
+            <input type="number" id="stationManageRate" class="mono" step="0.5" min="0">
+        </div>
+        <button class="btn btn-amber btn-block" onclick="submitStationManagement()"><span data-ar="حفظ" data-en="Save">حفظ</span></button>
+        <button class="btn btn-red btn-block" style="margin-top:8px;display:none;" id="stationDeleteBtn" onclick="deleteStation()"><i class="fa-solid fa-trash"></i> <span data-ar="حذف الجهاز" data-en="Delete Device">حذف الجهاز</span></button>
+        <div class="error-text" id="stationManageError"></div>
+    </div>
+</div>
+
+<!-- ============== PAYMENT METHOD SHEET ============== -->
+<div class="overlay" id="paymentMethodOverlay">
+    <div class="sheet">
+        <div class="sheet-handle"></div>
+        <div class="sheet-title"><span id="paymentMethodTitle" data-ar="إضافة طريقة دفع" data-en="Add Payment Method">إضافة طريقة دفع</span><button class="close-x" onclick="closeSheet('paymentMethodOverlay')"><i class="fa-solid fa-xmark"></i></button></div>
+        <input type="hidden" id="paymentMethodId">
+        <div class="field">
+            <label data-ar="اسم طريقة الدفع" data-en="Payment Method Name">اسم طريقة الدفع</label>
+            <input type="text" id="paymentMethodName" placeholder="مثال: إنستا باي">
+        </div>
+        <div class="field">
+            <label data-ar="الأيقونة" data-en="Icon">الأيقونة</label>
+            <select id="paymentMethodIcon">
+                <option value="fa-money-bill-wave">💰 كاش</option>
+                <option value="fa-mobile-screen-button">📱 محفظة إلكترونية</option>
+                <option value="fa-credit-card">💳 بطاقة ائتمان</option>
+                <option value="fa-building-columns">🏦 تحويل بنكي</option>
+                <option value="fa-wallet">👛 محفظة رقمية</option>
+                <option value="fa-qrcode">📱 QR Code</option>
+                <option value="fa-apple-pay">🍎 Apple Pay</option>
+                <option value="fa-google-pay">🤖 Google Pay</option>
+                <option value="fa-circle-dollar">🟡 عملة رقمية</option>
+            </select>
+        </div>
+        <div class="field">
+            <label data-ar="اللون" data-en="Color">اللون</label>
+            <select id="paymentMethodColor">
+                <option value="badge-teal">أزرق/تركواز</option>
+                <option value="badge-amber">برتقالي</option>
+                <option value="badge-green">أخضر</option>
+                <option value="badge-purple">بنفسجي</option>
+                <option value="badge-red">أحمر</option>
+            </select>
+        </div>
+        <div class="field" style="display:flex;align-items:center;gap:12px;">
+            <label style="margin-bottom:0;"> <span data-ar="مفعل" data-en="Active">مفعل</span></label>
+            <input type="checkbox" id="paymentMethodActive" checked style="width:auto;">
+        </div>
+        <button class="btn btn-amber btn-block" onclick="submitPaymentMethod()"><span data-ar="حفظ" data-en="Save">حفظ</span></button>
+        <button class="btn btn-red btn-block" style="margin-top:8px;display:none;" id="paymentDeleteBtn" onclick="deletePaymentMethod()"><i class="fa-solid fa-trash"></i> <span data-ar="حذف طريقة الدفع" data-en="Delete Payment Method">حذف طريقة الدفع</span></button>
+        <div class="error-text" id="paymentMethodError"></div>
+    </div>
+</div>
+
 <!-- ============== EXPENSE SHEET ============== -->
 <div class="overlay" id="expenseOverlay">
     <div class="sheet">
         <div class="sheet-handle"></div>
-        <div class="sheet-title">إضافة مصروف<button class="close-x" onclick="closeSheet('expenseOverlay')"><i class="fa-solid fa-xmark"></i></button></div>
-        <div class="field"><label>الوصف</label><input type="text" id="expenseDesc" placeholder="مثال: فاتورة كهرباء"></div>
-        <div class="field"><label>المبلغ</label><input type="number" id="expenseAmount" class="mono" placeholder="0"></div>
-        <button class="btn btn-amber btn-block" onclick="submitExpense()">حفظ</button>
+        <div class="sheet-title" data-ar="إضافة مصروف" data-en="Add Expense">إضافة مصروف<button class="close-x" onclick="closeSheet('expenseOverlay')"><i class="fa-solid fa-xmark"></i></button></div>
+        <div class="field"><label data-ar="الوصف" data-en="Description">الوصف</label><input type="text" id="expenseDesc" placeholder="مثال: فاتورة كهرباء"></div>
+        <div class="field"><label data-ar="المبلغ" data-en="Amount">المبلغ</label><input type="number" id="expenseAmount" class="mono" placeholder="0"></div>
+        <button class="btn btn-amber btn-block" onclick="submitExpense()"><span data-ar="حفظ" data-en="Save">حفظ</span></button>
         <div class="error-text" id="expenseError"></div>
-    </div>
-</div>
-
-<!-- ============== INVENTORY SHEET ============== -->
-<div class="overlay" id="inventoryOverlay">
-    <div class="sheet">
-        <div class="sheet-handle"></div>
-        <div class="sheet-title" id="inventorySheetTitle">إضافة صنف مخزون<button class="close-x" onclick="closeSheet('inventoryOverlay')"><i class="fa-solid fa-xmark"></i></button></div>
-        <input type="hidden" id="inventoryItemId">
-        <div class="field"><label>اسم الصنف</label><input type="text" id="inventoryName"></div>
-        <div class="field"><label>الكمية الحالية</label><input type="number" id="inventoryQty" class="mono"></div>
-        <div class="field"><label>حد التنبيه</label><input type="number" id="inventoryThreshold" class="mono"></div>
-        <button class="btn btn-amber btn-block" onclick="submitInventoryItem()">حفظ</button>
-        <div class="error-text" id="inventoryError"></div>
     </div>
 </div>
 
@@ -389,13 +494,13 @@ button:focus-visible, a:focus-visible, input:focus-visible, select:focus-visible
 <div class="overlay" id="menuItemOverlay">
     <div class="sheet">
         <div class="sheet-handle"></div>
-        <div class="sheet-title">إضافة صنف للقائمة<button class="close-x" onclick="closeSheet('menuItemOverlay')"><i class="fa-solid fa-xmark"></i></button></div>
-        <div class="field"><label>اسم الصنف</label><input type="text" id="menuItemName"></div>
-        <div class="field"><label>السعر</label><input type="number" id="menuItemPrice" class="mono"></div>
-        <div class="field"><label>النوع</label>
-            <select id="menuItemCategory"><option value="food">أكل</option><option value="drink">مشروب</option><option value="other">أخرى</option></select>
+        <div class="sheet-title" data-ar="إضافة صنف للقائمة" data-en="Add Menu Item">إضافة صنف للقائمة<button class="close-x" onclick="closeSheet('menuItemOverlay')"><i class="fa-solid fa-xmark"></i></button></div>
+        <div class="field"><label data-ar="اسم الصنف" data-en="Item Name">اسم الصنف</label><input type="text" id="menuItemName"></div>
+        <div class="field"><label data-ar="السعر" data-en="Price">السعر</label><input type="number" id="menuItemPrice" class="mono"></div>
+        <div class="field"><label data-ar="النوع" data-en="Category">النوع</label>
+            <select id="menuItemCategory"><option value="food" data-ar="أكل" data-en="Food">أكل</option><option value="drink" data-ar="مشروب" data-en="Drink">مشروب</option><option value="other" data-ar="أخرى" data-en="Other">أخرى</option></select>
         </div>
-        <button class="btn btn-amber btn-block" onclick="submitMenuItem()">حفظ</button>
+        <button class="btn btn-amber btn-block" onclick="submitMenuItem()"><span data-ar="حفظ" data-en="Save">حفظ</span></button>
         <div class="error-text" id="menuItemError"></div>
     </div>
 </div>
@@ -404,19 +509,18 @@ button:focus-visible, a:focus-visible, input:focus-visible, select:focus-visible
 <div class="overlay" id="employeeOverlay">
     <div class="sheet">
         <div class="sheet-handle"></div>
-        <div class="sheet-title">إضافة موظف<button class="close-x" onclick="closeSheet('employeeOverlay')"><i class="fa-solid fa-xmark"></i></button></div>
-        <div class="field"><label>الاسم</label><input type="text" id="employeeName"></div>
-        <div class="field"><label>PIN (4 أرقام)</label><input type="text" inputmode="numeric" maxlength="6" id="employeePin" class="mono"></div>
+        <div class="sheet-title" data-ar="إضافة موظف" data-en="Add Employee">إضافة موظف<button class="close-x" onclick="closeSheet('employeeOverlay')"><i class="fa-solid fa-xmark"></i></button></div>
+        <div class="field"><label data-ar="الاسم" data-en="Name">الاسم</label><input type="text" id="employeeName"></div>
+        <div class="field"><label data-ar="PIN (4 أرقام)" data-en="PIN (4 digits)">PIN (4 أرقام)</label><input type="text" inputmode="numeric" maxlength="6" id="employeePin" class="mono"></div>
         <div class="field">
-            <label>الصلاحيات</label>
-            <label style="display:flex;align-items:center;gap:8px;font-weight:500;color:var(--text);margin-bottom:6px;"><input type="checkbox" id="permStations" checked> إدارة الأجهزة والجلسات</label>
-            <label style="display:flex;align-items:center;gap:8px;font-weight:500;color:var(--text);margin-bottom:6px;"><input type="checkbox" id="permInventory"> إدارة المخزون</label>
-            <label style="display:flex;align-items:center;gap:8px;font-weight:500;color:var(--text);"><input type="checkbox" id="permShift"> إقفال الشيفت</label>
+            <label data-ar="الصلاحيات" data-en="Permissions">الصلاحيات</label>
+            <label style="display:flex;align-items:center;gap:8px;font-weight:500;color:var(--text);margin-bottom:6px;"><input type="checkbox" id="permStations" checked> <span data-ar="إدارة الأجهزة والجلسات" data-en="Manage devices & sessions">إدارة الأجهزة والجلسات</span></label>
+            <label style="display:flex;align-items:center;gap:8px;font-weight:500;color:var(--text);"><input type="checkbox" id="permShift"> <span data-ar="إقفال الشيفت" data-en="Close shift">إقفال الشيفت</span></label>
         </div>
-        <p style="font-size:11.5px;color:var(--text-faint);margin-bottom:12px;">
+        <p style="font-size:11.5px;color:var(--text-faint);margin-bottom:12px;" data-ar="ملاحظة أمان: الـ PIN مخزّن كنص عادي حاليًا لأن التطبيق مفيش له باك إند منفصل — مناسب لتحكم داخلي بسيط، مش بديل عن نظام مستخدمين حقيقي." data-en="Security note: PIN is stored as plain text currently as the app has no separate backend — suitable for simple internal control, not a replacement for a real user system.">
             ملاحظة أمان: الـ PIN مخزّن كنص عادي حاليًا لأن التطبيق مفيش له باك إند منفصل — مناسب لتحكم داخلي بسيط، مش بديل عن نظام مستخدمين حقيقي.
         </p>
-        <button class="btn btn-amber btn-block" onclick="submitEmployee()">حفظ</button>
+        <button class="btn btn-amber btn-block" onclick="submitEmployee()"><span data-ar="حفظ" data-en="Save">حفظ</span></button>
         <div class="error-text" id="employeeError"></div>
     </div>
 </div>
@@ -425,41 +529,68 @@ button:focus-visible, a:focus-visible, input:focus-visible, select:focus-visible
 <div class="overlay" id="closeShiftOverlay">
     <div class="sheet">
         <div class="sheet-handle"></div>
-        <div class="sheet-title">تأكيد إقفال الشيفت<button class="close-x" onclick="closeSheet('closeShiftOverlay')"><i class="fa-solid fa-xmark"></i></button></div>
+        <div class="sheet-title" data-ar="تأكيد إقفال الشيفت" data-en="Confirm Close Shift">تأكيد إقفال الشيفت<button class="close-x" onclick="closeSheet('closeShiftOverlay')"><i class="fa-solid fa-xmark"></i></button></div>
         <div class="panel" id="closeShiftSummary" style="margin-bottom:14px;"></div>
-        <button class="btn btn-amber btn-block" onclick="confirmCloseShift()"><i class="fa-solid fa-lock"></i> تأكيد الإقفال</button>
+        <button class="btn btn-amber btn-block" onclick="confirmCloseShift()"><i class="fa-solid fa-lock"></i> <span data-ar="تأكيد الإقفال" data-en="Confirm Close">تأكيد الإقفال</span></button>
     </div>
 </div>
 
 <div class="toast" id="toast"></div>
-
-<!-- Hidden print area used for the PDF export (jsPDF renders from data, this stays as a fallback/manual-print view) -->
 <div id="printArea" style="display:none;"></div>
 
 <script>
 // ============================================================
-// CONFIG — fill these in from your Supabase project settings
+// CONFIG
 // ============================================================
 const SUPABASE_URL = 'https://hdrvqgicxxgfolozxgjp.supabase.co';
 const SUPABASE_ANON_KEY = 'sb_publishable_dGNw7eTTempKBdFmAZRjYA_eaeEE2jj';
 const supabaseClient = window.supabase.createClient(SUPABASE_URL, SUPABASE_ANON_KEY);
 
 // ============================================================
+// LANGUAGE STATE
+// ============================================================
+let currentLang = 'ar';
+
+function toggleLanguage() {
+    currentLang = currentLang === 'ar' ? 'en' : 'ar';
+    document.documentElement.dir = currentLang === 'ar' ? 'rtl' : 'ltr';
+    document.documentElement.lang = currentLang;
+    document.getElementById('langToggleLabel').textContent = currentLang === 'ar' ? 'English' : 'العربية';
+    updateTexts();
+}
+
+function updateTexts() {
+    document.querySelectorAll('[data-ar][data-en]').forEach(el => {
+        el.textContent = currentLang === 'ar' ? el.dataset.ar : el.dataset.en;
+    });
+    document.querySelectorAll('select option[data-ar][data-en]').forEach(el => {
+        el.textContent = currentLang === 'ar' ? el.dataset.ar : el.dataset.en;
+    });
+    renderStationsGrid();
+    renderSettingsStations();
+    renderSettingsPaymentMethods();
+    if (document.getElementById('view-shift').classList.contains('active')) renderShiftView();
+    if (document.getElementById('view-settings').classList.contains('active')) renderSettings();
+}
+
+// ============================================================
 // STATE
 // ============================================================
-let business = null;          // current businesses row
-let deviceRecord = null;      // current devices row
+let business = null;
+let deviceRecord = null;
 let stations = [];
-let sessions = {};            // station_id -> active session row
+let sessions = {};
 let menuItems = [];
-let inventoryItems = [];
 let employees = [];
-let currentShift = null;      // open shifts row
-let currentUser = null;       // { type:'owner' } or { type:'employee', ...employee }
+let paymentMethods = [];
+let currentShift = null;
+let currentUser = null;
 let realtimeChannel = null;
 let tickInterval = null;
-let activeStationId = null;   // station currently open in the sheet
-let activeSessionOrders = []; // orders for the session in the open sheet
+let activeStationId = null;
+let activeSessionOrders = [];
+let selectedPaymentMethod = null;
+let endSessionStationId = null;
 
 // ============================================================
 // UTILITIES
@@ -469,7 +600,7 @@ function getDeviceId() {
     if (!id) { id = 'dev_' + Math.random().toString(36).slice(2) + Date.now().toString(36); localStorage.setItem('psr_device_id', id); }
     return id;
 }
-function money(n) { return (Number(n) || 0).toLocaleString('ar-EG', { maximumFractionDigits: 0 }); }
+function money(n) { return (Number(n) || 0).toLocaleString(currentLang === 'ar' ? 'ar-EG' : 'en-US', { maximumFractionDigits: 0 }); }
 function showToast(msg, type = 'success') {
     const el = document.getElementById('toast');
     el.textContent = msg; el.className = 'toast ' + type; el.style.display = 'block';
@@ -485,13 +616,11 @@ function navigateTo(viewId) {
     document.querySelectorAll('.nav-btn').forEach(b => b.classList.toggle('active', b.dataset.view === viewId));
     if (viewId === 'view-dashboard') renderDashboard();
     if (viewId === 'view-shift') renderShiftView();
-    if (viewId === 'view-settings') renderSettings();
+    if (viewId === 'view-settings') { renderSettings(); renderSettingsStations(); renderSettingsPaymentMethods(); }
 }
 function openSheet(id) { document.getElementById(id).classList.add('show'); }
 function closeSheet(id) { document.getElementById(id).classList.remove('show'); if (id === 'stationOverlay') activeStationId = null; }
-// Timestamps: every column in the new schema is `timestamptz`, so Supabase
-// always returns an explicit UTC offset — new Date(value) is safe as-is.
-// (See the two prior bug fixes in the old app for why this matters.)
+function t(ar, en) { return currentLang === 'ar' ? ar : en; }
 
 // ============================================================
 // SETUP / ACTIVATION / LOCK FLOW
@@ -501,12 +630,12 @@ async function handleSetupContinue() {
     const label = document.getElementById('setupDeviceLabel').value.trim();
     const errEl = document.getElementById('setupError');
     errEl.textContent = '';
-    if (!code) { errEl.textContent = 'اكتب كود النشاط.'; return; }
+    if (!code) { errEl.textContent = t('اكتب كود النشاط.', 'Enter the business code.'); return; }
     const btn = document.getElementById('setupContinueBtn');
     btn.disabled = true;
     try {
         const { data: biz, error } = await supabaseClient.from('businesses').select('*').eq('code', code).single();
-        if (error || !biz) { errEl.textContent = 'مفيش نشاط بالكود ده.'; return; }
+        if (error || !biz) { errEl.textContent = t('مفيش نشاط بالكود ده.', 'No business found with this code.'); return; }
         business = biz;
         localStorage.setItem('psr_business_code', code);
 
@@ -522,7 +651,7 @@ async function handleSetupContinue() {
         proceedToLock();
     } catch (e) {
         console.error(e);
-        errEl.textContent = 'حصل خطأ في الاتصال، حاول تاني.';
+        errEl.textContent = t('حصل خطأ في الاتصال، حاول تاني.', 'Connection error, please try again.');
     } finally { btn.disabled = false; }
 }
 
@@ -530,25 +659,25 @@ async function handleActivateDevice() {
     const code = document.getElementById('activationCodeInput').value.trim().toUpperCase();
     const errEl = document.getElementById('activationError');
     errEl.textContent = '';
-    if (!code) { errEl.textContent = 'اكتب كود التفعيل.'; return; }
+    if (!code) { errEl.textContent = t('اكتب كود التفعيل.', 'Enter the activation code.'); return; }
     try {
         const { data: actCode, error } = await supabaseClient.from('activation_codes').select('*').eq('business_id', business.id).eq('code', code).eq('used', false).single();
-        if (error || !actCode) { errEl.textContent = 'الكود غير صحيح أو مستخدم قبل كده.'; return; }
+        if (error || !actCode) { errEl.textContent = t('الكود غير صحيح أو مستخدم قبل كده.', 'Invalid or already used code.'); return; }
 
         const deviceId = getDeviceId();
         const expiry = new Date(); expiry.setDate(expiry.getDate() + 30);
         const { data: newDev, error: devErr } = await supabaseClient.from('devices').insert({
             business_id: business.id, device_id: deviceId,
-            device_label: localStorage.getItem('psr_device_label') || 'جهاز بدون اسم',
+            device_label: localStorage.getItem('psr_device_label') || t('جهاز بدون اسم', 'Unnamed device'),
             is_active: true, revoked: false, expiry_date: expiry.toISOString()
         }).select().single();
-        if (devErr) { errEl.textContent = 'فشل التفعيل، حاول تاني.'; return; }
+        if (devErr) { errEl.textContent = t('فشل التفعيل، حاول تاني.', 'Activation failed, try again.'); return; }
 
         await supabaseClient.from('activation_codes').update({ used: true, used_at: new Date().toISOString() }).eq('id', actCode.id);
         deviceRecord = newDev;
-        showToast('تم تفعيل الجهاز بنجاح', 'success');
+        showToast(t('تم تفعيل الجهاز بنجاح', 'Device activated successfully'), 'success');
         proceedToLock();
-    } catch (e) { console.error(e); errEl.textContent = 'حصل خطأ، حاول تاني.'; }
+    } catch (e) { console.error(e); errEl.textContent = t('حصل خطأ، حاول تاني.', 'Error, try again.'); }
 }
 
 function proceedToLock() {
@@ -556,9 +685,9 @@ function proceedToLock() {
     document.getElementById('lockBizName').textContent = business.name;
     const expiry = deviceRecord.expiry_date ? new Date(deviceRecord.expiry_date) : null;
     const subLine = document.getElementById('subStatusLine');
-    if (deviceRecord.revoked || !deviceRecord.is_active) { subLine.textContent = 'الجهاز موقوف — تواصل مع الإدارة'; }
-    else if (expiry && expiry < new Date()) { subLine.textContent = 'الاشتراك منتهي — تواصل مع الإدارة'; }
-    else if (expiry) { const days = Math.ceil((expiry - new Date()) / 86400000); subLine.textContent = `متبقي ${days} يوم على الاشتراك`; }
+    if (deviceRecord.revoked || !deviceRecord.is_active) { subLine.textContent = t('الجهاز موقوف — تواصل مع الإدارة', 'Device suspended — contact admin'); }
+    else if (expiry && expiry < new Date()) { subLine.textContent = t('الاشتراك منتهي — تواصل مع الإدارة', 'Subscription expired — contact admin'); }
+    else if (expiry) { const days = Math.ceil((expiry - new Date()) / 86400000); subLine.textContent = t(`متبقي ${days} يوم على الاشتراك`, `${days} days remaining on subscription`); }
     showScreen('lockScreen');
 }
 
@@ -566,12 +695,12 @@ async function handleUnlock() {
     const pin = document.getElementById('lockPinInput').value.trim();
     const errEl = document.getElementById('lockError');
     errEl.textContent = '';
-    if (deviceRecord.revoked || !deviceRecord.is_active) { errEl.textContent = 'الجهاز موقوف.'; return; }
-    if (deviceRecord.expiry_date && new Date(deviceRecord.expiry_date) < new Date()) { errEl.textContent = 'الاشتراك منتهي.'; return; }
-    if (!pin) { errEl.textContent = 'اكتب الـ PIN.'; return; }
+    if (deviceRecord.revoked || !deviceRecord.is_active) { errEl.textContent = t('الجهاز موقوف.', 'Device suspended.'); return; }
+    if (deviceRecord.expiry_date && new Date(deviceRecord.expiry_date) < new Date()) { errEl.textContent = t('الاشتراك منتهي.', 'Subscription expired.'); return; }
+    if (!pin) { errEl.textContent = t('اكتب الـ PIN.', 'Enter the PIN.'); return; }
 
     if (pin === business.owner_pin) {
-        currentUser = { type: 'owner', name: 'المالك', permissions: { stations: true, inventory: true, shift: true } };
+        currentUser = { type: 'owner', name: t('المالك', 'Owner'), permissions: { stations: true, inventory: true, shift: true } };
         document.getElementById('lockPinInput').value = '';
         enterMainApp();
         return;
@@ -583,7 +712,7 @@ async function handleUnlock() {
         enterMainApp();
         return;
     }
-    errEl.textContent = 'PIN غير صحيح.';
+    errEl.textContent = t('PIN غير صحيح.', 'Incorrect PIN.');
 }
 
 function lockApp() {
@@ -603,7 +732,6 @@ function switchBusiness() {
     showScreen('setupScreen');
 }
 
-// Auto-resume if this device already has a saved business + valid device record
 async function tryAutoResume() {
     const code = localStorage.getItem('psr_business_code');
     if (!code) return;
@@ -631,18 +759,18 @@ async function enterMainApp() {
     await loadAllData();
     subscribeRealtime();
     startTicker();
+    updateTexts();
 }
 
 async function loadAllData() {
-    await Promise.all([loadStations(), loadMenuItems(), loadInventory(), loadEmployees(), loadOrOpenShift()]);
-    renderDashboard(); renderStationsGrid(); renderInventoryList();
+    await Promise.all([loadStations(), loadMenuItems(), loadEmployees(), loadPaymentMethods(), loadOrOpenShift()]);
+    renderDashboard(); renderStationsGrid(); renderSettingsStations(); renderSettingsPaymentMethods();
 }
 
 async function loadStations() {
     let { data } = await supabaseClient.from('stations').select('*').eq('business_id', business.id).order('number');
     if (!data || data.length === 0) {
-        // First run for this business: seed stations based on total_stations
-        const seed = Array.from({ length: business.total_stations || 4 }, (_, i) => ({ business_id: business.id, number: i + 1, rate: 20 }));
+        const seed = Array.from({ length: business.total_stations || 4 }, (_, i) => ({ business_id: business.id, number: i + 1, rate: 20, name: `جهاز ${i + 1}` }));
         const { data: created } = await supabaseClient.from('stations').insert(seed).select();
         data = created || [];
     }
@@ -657,14 +785,45 @@ async function loadMenuItems() {
     menuItems = data || [];
 }
 
-async function loadInventory() {
-    const { data } = await supabaseClient.from('inventory_items').select('*').eq('business_id', business.id).order('name');
-    inventoryItems = data || [];
-}
-
 async function loadEmployees() {
     const { data } = await supabaseClient.from('employees').select('*').eq('business_id', business.id).order('created_at');
     employees = data || [];
+}
+
+async function loadPaymentMethods() {
+    try {
+        const { data, error } = await supabaseClient.from('payment_methods').select('*').eq('business_id', business.id).order('created_at');
+        if (error) throw error;
+        if (data && data.length > 0) {
+            paymentMethods = data;
+            return;
+        }
+    } catch (e) {
+        console.warn('Error loading payment methods:', e);
+    }
+    
+    const defaults = [
+        { business_id: business.id, name: 'كاش', icon: 'fa-money-bill-wave', color: 'badge-green', active: true },
+        { business_id: business.id, name: 'إنستا باي', icon: 'fa-mobile-screen-button', color: 'badge-purple', active: true },
+        { business_id: business.id, name: 'محفظة إلكترونية', icon: 'fa-wallet', color: 'badge-teal', active: true },
+        { business_id: business.id, name: 'بطاقة ائتمان', icon: 'fa-credit-card', color: 'badge-amber', active: true }
+    ];
+    
+    try {
+        const { data: created, error } = await supabaseClient.from('payment_methods').insert(defaults).select();
+        if (!error && created) {
+            paymentMethods = created;
+            return;
+        }
+    } catch (e) {
+        console.warn('Could not create default payment methods:', e);
+    }
+    
+    paymentMethods = defaults.map((pm, i) => ({
+        ...pm,
+        id: 'temp_' + Date.now() + '_' + i,
+        created_at: new Date().toISOString()
+    }));
 }
 
 async function loadOrOpenShift() {
@@ -677,15 +836,14 @@ async function loadOrOpenShift() {
 }
 
 // ============================================================
-// REALTIME — this is the whole point of the rebuild: every device
-// gets pushed updates instantly instead of polling and guessing.
+// REALTIME
 // ============================================================
 function subscribeRealtime() {
     if (realtimeChannel) supabaseClient.removeChannel(realtimeChannel);
     realtimeChannel = supabaseClient.channel('biz-' + business.id)
         .on('postgres_changes', { event: '*', schema: 'public', table: 'sessions', filter: 'business_id=eq.' + business.id }, handleSessionChange)
-        .on('postgres_changes', { event: '*', schema: 'public', table: 'inventory_items', filter: 'business_id=eq.' + business.id }, handleInventoryChange)
         .on('postgres_changes', { event: '*', schema: 'public', table: 'session_orders' }, handleOrderChange)
+        .on('postgres_changes', { event: '*', schema: 'public', table: 'stations', filter: 'business_id=eq.' + business.id }, handleStationChange)
         .subscribe();
 }
 
@@ -704,13 +862,19 @@ function handleSessionChange(payload) {
     }
     renderStationsGrid();
     if (document.getElementById('view-dashboard').classList.contains('active')) renderDashboard();
-    if (activeStationId === row.station_id) openStationSheet(activeStationId); // refresh open sheet
+    if (activeStationId === row.station_id) openStationSheet(activeStationId);
 }
 
-function handleInventoryChange() { loadInventory().then(renderInventoryList); }
 function handleOrderChange(payload) {
     const row = payload.new && Object.keys(payload.new).length ? payload.new : payload.old;
     if (activeStationId && row && row.session_id === (sessions[activeStationId] || {}).id) renderStationOrdersSection();
+}
+
+function handleStationChange() {
+    loadStations().then(() => {
+        renderStationsGrid();
+        renderSettingsStations();
+    });
 }
 
 function startTicker() {
@@ -731,7 +895,7 @@ function formatElapsed(start) {
 // DASHBOARD
 // ============================================================
 async function renderDashboard() {
-    const { data: todaySessions } = await supabaseClient.from('sessions').select('amount').eq('business_id', business.id).eq('status', 'completed').gte('started_at', currentShift.opened_at);
+    const { data: todaySessions } = await supabaseClient.from('sessions').select('amount, payment_method').eq('business_id', business.id).eq('status', 'completed').gte('started_at', currentShift.opened_at);
     const revenue = (todaySessions || []).reduce((sum, s) => sum + (Number(s.amount) || 0), 0);
     const { data: todayExpenses } = await supabaseClient.from('expenses').select('amount').eq('shift_id', currentShift.id);
     const expenses = (todayExpenses || []).reduce((sum, e) => sum + Number(e.amount), 0);
@@ -740,12 +904,6 @@ async function renderDashboard() {
     document.getElementById('dashExpenses').textContent = money(expenses);
     document.getElementById('dashActive').textContent = Object.keys(sessions).length;
     document.getElementById('dashAvailable').textContent = stations.length - Object.keys(sessions).length;
-
-    const lowStock = inventoryItems.filter(i => Number(i.quantity) <= Number(i.threshold));
-    const alertsEl = document.getElementById('dashInventoryAlerts');
-    alertsEl.innerHTML = lowStock.length === 0
-        ? '<div class="empty"><i class="fa-solid fa-check"></i>مفيش تنبيهات مخزون دلوقتي</div>'
-        : lowStock.map(i => `<div class="list-row low-stock"><div><div class="row-title">${escapeHtml(i.name)}</div><div class="row-sub">الحد الأدنى ${money(i.threshold)}</div></div><div class="row-value">${money(i.quantity)}</div></div>`).join('');
 }
 
 // ============================================================
@@ -756,24 +914,241 @@ function renderStationsGrid() {
     grid.innerHTML = stations.map(st => {
         const s = sessions[st.id];
         const occupied = !!s;
+        const statusText = occupied ? t('شغال', 'Active') : t('متاح', 'Available');
+        const displayName = st.name ? st.name : t('جهاز', 'Device') + ' ' + st.number;
         return `<div class="station-card ${occupied ? 'occupied' : ''}" onclick="openStationSheet('${st.id}')">
-            <div><div class="station-num">جهاز ${st.number}</div><div class="station-status">${occupied ? 'شغال' : 'متاح'}</div></div>
-            ${occupied ? `<div class="station-timer mono" data-start="${s.started_at}">${formatElapsed(new Date(s.started_at))}</div>` : `<div class="station-rate">${money(st.rate)} ج/ساعة</div>`}
+            <div><div class="station-num">${displayName}</div><div class="station-status">${statusText}</div></div>
+            ${occupied ? `<div class="station-timer mono" data-start="${s.started_at}">${formatElapsed(new Date(s.started_at))}</div>` : `<div class="station-rate">${money(st.rate)} ${t('ج/ساعة', 'EGP/hr')}</div>`}
         </div>`;
     }).join('');
 }
 
+// ============================================================
+// STATION MANAGEMENT (Settings)
+// ============================================================
+function renderSettingsStations() {
+    const el = document.getElementById('settingsStations');
+    if (!stations || stations.length === 0) {
+        el.innerHTML = `<div class="empty"><i class="fa-solid fa-gamepad"></i>${t('مفيش أجهزة — ضيف أول جهاز', 'No devices — add your first device')}</div>`;
+        return;
+    }
+    el.innerHTML = stations.map(st => {
+        const displayName = st.name ? st.name : t('جهاز', 'Device') + ' ' + st.number;
+        return `<div class="list-row">
+            <div><div class="row-title">${escapeHtml(displayName)}</div><div class="row-sub">${t('رقم', 'No.')} ${st.number} — ${money(st.rate)} ${t('ج/ساعة', 'EGP/hr')}</div></div>
+            <div class="row-actions">
+                <button class="btn btn-ghost btn-sm" onclick="editStation('${st.id}')"><i class="fa-solid fa-pen"></i></button>
+                <button class="btn btn-danger-sm" onclick="deleteStationById('${st.id}')"><i class="fa-solid fa-trash"></i></button>
+            </div>
+        </div>`;
+    }).join('');
+}
+
+function openStationManagementSheet() {
+    document.getElementById('stationManageId').value = '';
+    document.getElementById('stationManageNumber').value = stations.length + 1;
+    document.getElementById('stationManageName').value = '';
+    document.getElementById('stationManageRate').value = '20';
+    document.getElementById('stationDeleteBtn').style.display = 'none';
+    document.getElementById('stationManageError').textContent = '';
+    document.getElementById('stationManagementTitle').textContent = t('إضافة جهاز', 'Add Device');
+    openSheet('stationManagementOverlay');
+}
+
+function editStation(stationId) {
+    const st = stations.find(s => s.id === stationId);
+    if (!st) return;
+    document.getElementById('stationManageId').value = st.id;
+    document.getElementById('stationManageNumber').value = st.number;
+    document.getElementById('stationManageName').value = st.name || '';
+    document.getElementById('stationManageRate').value = st.rate;
+    document.getElementById('stationDeleteBtn').style.display = 'flex';
+    document.getElementById('stationManageError').textContent = '';
+    document.getElementById('stationManagementTitle').textContent = t('تعديل جهاز', 'Edit Device');
+    openSheet('stationManagementOverlay');
+}
+
+async function submitStationManagement() {
+    const id = document.getElementById('stationManageId').value;
+    const number = parseInt(document.getElementById('stationManageNumber').value);
+    const name = document.getElementById('stationManageName').value.trim();
+    const rate = parseFloat(document.getElementById('stationManageRate').value);
+    const errEl = document.getElementById('stationManageError');
+    errEl.textContent = '';
+
+    if (!number || number < 1) { errEl.textContent = t('رقم الجهاز مطلوب.', 'Device number is required.'); return; }
+    if (isNaN(rate) || rate < 0) { errEl.textContent = t('السعر مطلوب.', 'Rate is required.'); return; }
+
+    if (!id && stations.some(s => s.number === number)) {
+        errEl.textContent = t('رقم الجهاز مستخدم بالفعل.', 'Device number already exists.');
+        return;
+    }
+
+    try {
+        if (id) {
+            await supabaseClient.from('stations').update({ number, name, rate }).eq('id', id);
+            showToast(t('تم تحديث الجهاز', 'Device updated'), 'success');
+        } else {
+            await supabaseClient.from('stations').insert({ business_id: business.id, number, name, rate });
+            showToast(t('تم إضافة الجهاز', 'Device added'), 'success');
+        }
+        closeSheet('stationManagementOverlay');
+        await loadStations();
+        renderStationsGrid();
+        renderSettingsStations();
+        renderDashboard();
+    } catch (e) {
+        errEl.textContent = t('حصل خطأ، حاول تاني.', 'Error, try again.');
+        console.error(e);
+    }
+}
+
+async function deleteStationById(stationId) {
+    if (!confirm(t('هل أنت متأكد من حذف هذا الجهاز؟', 'Are you sure you want to delete this device?'))) return;
+
+    if (sessions[stationId]) {
+        showToast(t('لا يمكن حذف جهاز عليه جلسة شغالة.', 'Cannot delete a device with an active session.'), 'error');
+        return;
+    }
+
+    try {
+        await supabaseClient.from('stations').delete().eq('id', stationId);
+        showToast(t('تم حذف الجهاز', 'Device deleted'), 'success');
+        await loadStations();
+        renderStationsGrid();
+        renderSettingsStations();
+        renderDashboard();
+    } catch (e) {
+        showToast(t('فشل الحذف، حاول تاني.', 'Delete failed, try again.'), 'error');
+        console.error(e);
+    }
+}
+
+async function deleteStation() {
+    const id = document.getElementById('stationManageId').value;
+    if (!id) return;
+    closeSheet('stationManagementOverlay');
+    await deleteStationById(id);
+}
+
+// ============================================================
+// PAYMENT METHODS (Settings)
+// ============================================================
+function renderSettingsPaymentMethods() {
+    const el = document.getElementById('settingsPaymentMethods');
+    if (!paymentMethods || paymentMethods.length === 0) {
+        el.innerHTML = `<div class="empty"><i class="fa-solid fa-credit-card"></i>${t('مفيش طرق دفع — ضيف أول طريقة', 'No payment methods — add your first method')}</div>`;
+        return;
+    }
+    el.innerHTML = paymentMethods.map(pm => {
+        const colorMap = {
+            'badge-teal': 'var(--teal)',
+            'badge-amber': 'var(--amber)',
+            'badge-green': 'var(--green)',
+            'badge-purple': 'var(--purple)',
+            'badge-red': 'var(--red)'
+        };
+        const color = colorMap[pm.color] || 'var(--text)';
+        return `<div class="list-row">
+            <div><div class="row-title"><i class="fa-solid ${pm.icon}" style="color:${color};width:20px;"></i> ${escapeHtml(pm.name)}</div>
+            <div class="row-sub">${pm.active ? t('مفعل', 'Active') : t('غير مفعل', 'Inactive')}</div></div>
+            <div class="row-actions">
+                <button class="btn btn-ghost btn-sm" onclick="editPaymentMethod('${pm.id}')"><i class="fa-solid fa-pen"></i></button>
+                <button class="btn btn-danger-sm" onclick="deletePaymentMethodById('${pm.id}')"><i class="fa-solid fa-trash"></i></button>
+            </div>
+        </div>`;
+    }).join('');
+}
+
+function openPaymentMethodSheet() {
+    document.getElementById('paymentMethodId').value = '';
+    document.getElementById('paymentMethodName').value = '';
+    document.getElementById('paymentMethodIcon').value = 'fa-money-bill-wave';
+    document.getElementById('paymentMethodColor').value = 'badge-green';
+    document.getElementById('paymentMethodActive').checked = true;
+    document.getElementById('paymentDeleteBtn').style.display = 'none';
+    document.getElementById('paymentMethodError').textContent = '';
+    document.getElementById('paymentMethodTitle').textContent = t('إضافة طريقة دفع', 'Add Payment Method');
+    openSheet('paymentMethodOverlay');
+}
+
+function editPaymentMethod(pmId) {
+    const pm = paymentMethods.find(p => p.id === pmId);
+    if (!pm) return;
+    document.getElementById('paymentMethodId').value = pm.id;
+    document.getElementById('paymentMethodName').value = pm.name;
+    document.getElementById('paymentMethodIcon').value = pm.icon || 'fa-money-bill-wave';
+    document.getElementById('paymentMethodColor').value = pm.color || 'badge-green';
+    document.getElementById('paymentMethodActive').checked = pm.active !== false;
+    document.getElementById('paymentDeleteBtn').style.display = 'flex';
+    document.getElementById('paymentMethodError').textContent = '';
+    document.getElementById('paymentMethodTitle').textContent = t('تعديل طريقة دفع', 'Edit Payment Method');
+    openSheet('paymentMethodOverlay');
+}
+
+async function submitPaymentMethod() {
+    const id = document.getElementById('paymentMethodId').value;
+    const name = document.getElementById('paymentMethodName').value.trim();
+    const icon = document.getElementById('paymentMethodIcon').value;
+    const color = document.getElementById('paymentMethodColor').value;
+    const active = document.getElementById('paymentMethodActive').checked;
+    const errEl = document.getElementById('paymentMethodError');
+    errEl.textContent = '';
+
+    if (!name) { errEl.textContent = t('اسم طريقة الدفع مطلوب.', 'Payment method name is required.'); return; }
+
+    try {
+        if (id) {
+            await supabaseClient.from('payment_methods').update({ name, icon, color, active }).eq('id', id);
+            showToast(t('تم تحديث طريقة الدفع', 'Payment method updated'), 'success');
+        } else {
+            await supabaseClient.from('payment_methods').insert({ business_id: business.id, name, icon, color, active });
+            showToast(t('تم إضافة طريقة الدفع', 'Payment method added'), 'success');
+        }
+        closeSheet('paymentMethodOverlay');
+        await loadPaymentMethods();
+        renderSettingsPaymentMethods();
+    } catch (e) {
+        errEl.textContent = t('حصل خطأ، حاول تاني.', 'Error, try again.');
+        console.error(e);
+    }
+}
+
+async function deletePaymentMethodById(pmId) {
+    if (!confirm(t('هل أنت متأكد من حذف طريقة الدفع هذه؟', 'Are you sure you want to delete this payment method?'))) return;
+    try {
+        await supabaseClient.from('payment_methods').delete().eq('id', pmId);
+        showToast(t('تم حذف طريقة الدفع', 'Payment method deleted'), 'success');
+        await loadPaymentMethods();
+        renderSettingsPaymentMethods();
+    } catch (e) {
+        showToast(t('فشل الحذف، حاول تاني.', 'Delete failed, try again.'), 'error');
+        console.error(e);
+    }
+}
+
+async function deletePaymentMethod() {
+    const id = document.getElementById('paymentMethodId').value;
+    if (!id) return;
+    closeSheet('paymentMethodOverlay');
+    await deletePaymentMethodById(id);
+}
+
+// ============================================================
+// STATION SHEET (Session Management)
+// ============================================================
 async function openStationSheet(stationId) {
     activeStationId = stationId;
     const st = stations.find(s => s.id === stationId);
     const session = sessions[stationId];
-    document.getElementById('stationSheetTitle').textContent = 'جهاز ' + st.number;
+    const displayName = st.name ? st.name : t('جهاز', 'Device') + ' ' + st.number;
+    document.getElementById('stationSheetTitle').textContent = displayName;
     const body = document.getElementById('stationSheetBody');
 
     if (!session) {
         body.innerHTML = `
-            <div class="field"><label>السعر بالساعة</label><input type="number" id="stationRateInput" class="mono" value="${st.rate}"></div>
-            <button class="btn btn-teal btn-block" onclick="startSession('${stationId}')"><i class="fa-solid fa-play"></i> بدء الجلسة</button>`;
+            <div class="field"><label>${t('السعر بالساعة', 'Hourly Rate')}</label><input type="number" id="stationRateInput" class="mono" value="${st.rate}"></div>
+            <button class="btn btn-teal btn-block" onclick="startSession('${stationId}')"><i class="fa-solid fa-play"></i> ${t('بدء الجلسة', 'Start Session')}</button>`;
         openSheet('stationOverlay');
         return;
     }
@@ -783,17 +1158,19 @@ async function openStationSheet(stationId) {
     body.innerHTML = `
         <div style="text-align:center;margin-bottom:16px;">
             <div class="station-timer mono" style="font-size:32px;" data-start="${session.started_at}">${formatElapsed(new Date(session.started_at))}</div>
-            <div class="row-sub mono">${money(session.rate)} ج/ساعة</div>
+            <div class="row-sub mono">${money(session.rate)} ${t('ج/ساعة', 'EGP/hr')}</div>
         </div>
-        <div class="section-title">إضافة طلب</div>
+        <div class="section-title">${t('إضافة طلب', 'Add Order')}</div>
         <div style="display:flex;flex-wrap:wrap;gap:8px;margin-bottom:12px;" id="menuQuickAdd">
-            ${menuItems.map(m => `<button class="btn btn-ghost btn-sm" onclick="addOrderItem('${session.id}','${m.id}')">${escapeHtml(m.name)} · ${money(m.price)}</button>`).join('') || '<span style="color:var(--text-faint);font-size:13px;">مفيش أصناف — ضيفها من الإعدادات</span>'}
+            ${menuItems.map(m => `<button class="btn btn-ghost btn-sm" onclick="addOrderItem('${session.id}','${m.id}')">${escapeHtml(m.name)} - ${money(m.price)}</button>`).join('') || `<span style="color:var(--text-faint);font-size:13px;">${t('مفيش أصناف — ضيفها من الإعدادات', 'No items — add them from settings')}</span>`}
         </div>
-        <div class="section-title">الطلبات</div>
+        <div class="section-title">${t('الطلبات', 'Orders')}</div>
         <div class="panel" id="stationOrdersList"></div>
-        <div style="margin-top:16px;display:flex;gap:8px;">
-            <button class="btn btn-ghost" style="flex:1;" onclick="closeSheet('stationOverlay')">إغلاق</button>
-            <button class="btn btn-red" style="flex:1;" onclick="endSession('${stationId}')"><i class="fa-solid fa-stop"></i> إنهاء الجلسة</button>
+        <div style="margin-top:16px;display:flex;flex-direction:column;gap:8px;">
+            <div style="display:flex;gap:8px;">
+                <button class="btn btn-ghost" style="flex:1;" onclick="closeSheet('stationOverlay')">${t('إغلاق', 'Close')}</button>
+                <button class="btn btn-red" style="flex:1;" onclick="showEndSessionPayment('${stationId}')"><i class="fa-solid fa-stop"></i> ${t('إنهاء الجلسة', 'End Session')}</button>
+            </div>
         </div>`;
     renderStationOrdersSection();
     openSheet('stationOverlay');
@@ -803,8 +1180,27 @@ function renderStationOrdersSection() {
     const el = document.getElementById('stationOrdersList');
     if (!el) return;
     el.innerHTML = activeSessionOrders.length === 0
-        ? '<div class="empty"><i class="fa-solid fa-utensils"></i>مفيش طلبات على الجلسة دي</div>'
-        : activeSessionOrders.map(o => `<div class="list-row"><div><div class="row-title">${escapeHtml(o.item_name)}</div><div class="row-sub">${o.quantity} × ${money(o.unit_price)}</div></div><div class="row-value">${money(o.quantity * o.unit_price)}</div></div>`).join('');
+        ? `<div class="empty"><i class="fa-solid fa-utensils"></i>${t('مفيش طلبات على الجلسة دي', 'No orders on this session')}</div>`
+        : activeSessionOrders.map(o => `<div class="list-row">
+            <div><div class="row-title">${escapeHtml(o.item_name)}</div><div class="row-sub">${o.quantity} × ${money(o.unit_price)}</div></div>
+            <div style="display:flex;align-items:center;gap:10px;">
+                <div class="row-value">${money(o.quantity * o.unit_price)}</div>
+                <button class="btn btn-ghost btn-sm" style="padding:6px 10px;" onclick="removeOrderItem('${o.id}')" title="${t('حذف/إنقاص', 'Remove/Decrease')}"><i class="fa-solid fa-minus"></i></button>
+            </div>
+        </div>`).join('');
+}
+
+async function removeOrderItem(orderId) {
+    const order = activeSessionOrders.find(o => o.id === orderId);
+    if (!order) return;
+    if (order.quantity > 1) {
+        await supabaseClient.from('session_orders').update({ quantity: order.quantity - 1 }).eq('id', orderId);
+        order.quantity -= 1;
+    } else {
+        await supabaseClient.from('session_orders').delete().eq('id', orderId);
+        activeSessionOrders = activeSessionOrders.filter(o => o.id !== orderId);
+    }
+    renderStationOrdersSection();
 }
 
 async function startSession(stationId) {
@@ -812,11 +1208,11 @@ async function startSession(stationId) {
     const { data, error } = await supabaseClient.from('sessions').insert({
         business_id: business.id, station_id: stationId, rate, started_by_device: getDeviceId()
     }).select().single();
-    if (error) { showToast('فشل بدء الجلسة', 'error'); return; }
+    if (error) { showToast(t('فشل بدء الجلسة', 'Failed to start session'), 'error'); return; }
     sessions[stationId] = data;
     renderStationsGrid();
     closeSheet('stationOverlay');
-    showToast('اتبدأت الجلسة', 'success');
+    showToast(t('اتبدأت الجلسة', 'Session started'), 'success');
 }
 
 async function addOrderItem(sessionId, menuItemId) {
@@ -833,73 +1229,111 @@ async function addOrderItem(sessionId, menuItemId) {
     renderStationOrdersSection();
 }
 
-async function endSession(stationId) {
+// ============================================================
+// END SESSION WITH PAYMENT
+// ============================================================
+function showEndSessionPayment(stationId) {
+    endSessionStationId = stationId;
     const session = sessions[stationId];
     if (!session) return;
+
     const elapsedHours = (Date.now() - new Date(session.started_at).getTime()) / 3600000;
     const timeCost = elapsedHours * Number(session.rate);
     const ordersCost = activeSessionOrders.reduce((sum, o) => sum + o.quantity * o.unit_price, 0);
     const amount = Math.round((timeCost + ordersCost) * 100) / 100;
 
-    const { error } = await supabaseClient.from('sessions').update({ status: 'completed', ended_at: new Date().toISOString(), amount }).eq('id', session.id);
-    if (error) { showToast('فشل إنهاء الجلسة', 'error'); return; }
-    delete sessions[stationId];
-    renderStationsGrid();
-    closeSheet('stationOverlay');
-    showToast(`اتقفلت الجلسة — ${money(amount)} ج`, 'success');
-    renderDashboard();
-}
-
-function escapeHtml(str) { const d = document.createElement('div'); d.textContent = str ?? ''; return d.innerHTML; }
-
-// ============================================================
-// INVENTORY
-// ============================================================
-function renderInventoryList() {
-    const el = document.getElementById('inventoryList');
-    el.innerHTML = inventoryItems.length === 0
-        ? '<div class="empty"><i class="fa-solid fa-boxes-stacked"></i>ضيف أول صنف مخزون</div>'
-        : inventoryItems.map(i => {
-            const low = Number(i.quantity) <= Number(i.threshold);
-            return `<div class="list-row ${low ? 'low-stock' : ''}" onclick="openInventorySheet('${i.id}')" style="cursor:pointer;">
-                <div><div class="row-title">${escapeHtml(i.name)}</div><div class="row-sub">حد التنبيه ${money(i.threshold)}</div></div>
-                <div class="row-value">${money(i.quantity)}</div>
-            </div>`;
-        }).join('');
-    if (!document.getElementById('addInventoryBtn')) {
-        const btn = document.createElement('button');
-        btn.id = 'addInventoryBtn'; btn.className = 'btn btn-ghost btn-block'; btn.style.marginTop = '10px';
-        btn.innerHTML = '<i class="fa-solid fa-plus"></i> إضافة صنف مخزون';
-        btn.onclick = () => openInventorySheet(null);
-        el.parentElement.insertBefore(btn, el.nextSibling);
-    }
-}
-
-function openInventorySheet(itemId) {
-    const item = itemId ? inventoryItems.find(i => i.id === itemId) : null;
-    document.getElementById('inventorySheetTitle').firstChild.textContent = item ? 'تعديل الصنف' : 'إضافة صنف مخزون';
-    document.getElementById('inventoryItemId').value = item ? item.id : '';
-    document.getElementById('inventoryName').value = item ? item.name : '';
-    document.getElementById('inventoryQty').value = item ? item.quantity : '';
-    document.getElementById('inventoryThreshold').value = item ? item.threshold : '';
-    document.getElementById('inventoryError').textContent = '';
-    openSheet('inventoryOverlay');
-}
-
-async function submitInventoryItem() {
-    const id = document.getElementById('inventoryItemId').value;
-    const name = document.getElementById('inventoryName').value.trim();
-    const quantity = parseFloat(document.getElementById('inventoryQty').value) || 0;
-    const threshold = parseFloat(document.getElementById('inventoryThreshold').value) || 0;
-    if (!name) { document.getElementById('inventoryError').textContent = 'اكتب اسم الصنف.'; return; }
-    if (id) {
-        await supabaseClient.from('inventory_items').update({ name, quantity, threshold, updated_at: new Date().toISOString() }).eq('id', id);
+    const body = document.getElementById('stationSheetBody');
+    
+    const activeMethods = paymentMethods.filter(pm => pm.active !== false);
+    
+    let paymentHtml = `
+        <div style="text-align:center;margin:12px 0;">
+            <div style="font-size:28px;font-weight:700;color:var(--amber);">${money(amount)} ${t('ج', 'EGP')}</div>
+            <div style="font-size:12px;color:var(--text-dim);">${t('المبلغ الإجمالي', 'Total Amount')}</div>
+        </div>
+        <div class="section-title">${t('اختر طريقة الدفع', 'Select Payment Method')}</div>`;
+    
+    if (activeMethods.length === 0) {
+        paymentHtml += `
+            <div class="empty" style="padding:20px;">
+                <i class="fa-solid fa-credit-card"></i>
+                ${t('مفيش طرق دفع مفعلة — روح الإعدادات وضيف طريقة', 'No active payment methods — go to settings and add one')}
+            </div>
+            <button class="btn btn-ghost btn-block" onclick="cancelEndSession()">${t('رجوع', 'Back')}</button>`;
     } else {
-        await supabaseClient.from('inventory_items').insert({ business_id: business.id, name, quantity, threshold });
+        paymentHtml += `
+            <div class="payment-options" id="paymentOptions">
+                ${activeMethods.map(pm => `
+                    <div class="payment-option" data-id="${pm.id}" onclick="selectPaymentMethod('${pm.id}')">
+                        <i class="fa-solid ${pm.icon}"></i>
+                        ${escapeHtml(pm.name)}
+                    </div>
+                `).join('')}
+            </div>
+            <div style="display:flex;gap:8px;margin-top:12px;">
+                <button class="btn btn-ghost" style="flex:1;" onclick="cancelEndSession()">${t('رجوع', 'Back')}</button>
+                <button class="btn btn-amber" style="flex:1;" id="confirmEndBtn" onclick="confirmEndSessionWithPayment()" disabled>
+                    <i class="fa-solid fa-check"></i> ${t('تأكيد الدفع', 'Confirm Payment')}
+                </button>
+            </div>`;
     }
-    closeSheet('inventoryOverlay');
-    showToast('تم الحفظ', 'success');
-    await loadInventory(); renderInventoryList(); renderDashboard();
+    
+    paymentHtml += `<div class="error-text" id="endSessionError"></div>`;
+    body.innerHTML = paymentHtml;
+    selectedPaymentMethod = null;
+}
+
+function selectPaymentMethod(pmId) {
+    selectedPaymentMethod = pmId;
+    document.querySelectorAll('.payment-option').forEach(el => {
+        el.classList.toggle('selected', el.dataset.id === pmId);
+    });
+    const confirmBtn = document.getElementById('confirmEndBtn');
+    if (confirmBtn) confirmBtn.disabled = false;
+}
+
+function cancelEndSession() {
+    if (activeStationId) openStationSheet(activeStationId);
+}
+
+async function confirmEndSessionWithPayment() {
+    if (!selectedPaymentMethod) {
+        document.getElementById('endSessionError').textContent = t('اختر طريقة دفع أولاً.', 'Select a payment method first.');
+        return;
+    }
+    const stationId = endSessionStationId;
+    const session = sessions[stationId];
+    if (!session) return;
+
+    const elapsedHours = (Date.now() - new Date(session.started_at).getTime()) / 3600000;
+    const timeCost = elapsedHours * Number(session.rate);
+    const ordersCost = activeSessionOrders.reduce((sum, o) => sum + o.quantity * o.unit_price, 0);
+    const amount = Math.round((timeCost + ordersCost) * 100) / 100;
+
+    try {
+        const { error } = await supabaseClient.from('sessions').update({
+            status: 'completed',
+            ended_at: new Date().toISOString(),
+            amount: amount,
+            payment_method: selectedPaymentMethod
+        }).eq('id', session.id);
+        
+        if (error) {
+            console.error('Error ending session:', error);
+            showToast(t('فشل إنهاء الجلسة: ' + error.message, 'Failed to end session: ' + error.message), 'error');
+            return;
+        }
+        
+        delete sessions[stationId];
+        renderStationsGrid();
+        closeSheet('stationOverlay');
+        const pm = paymentMethods.find(p => p.id === selectedPaymentMethod);
+        showToast(`${t('اتقفلت الجلسة —', 'Session closed —')} ${money(amount)} ${t('ج', 'EGP')} (${pm ? pm.name : ''})`, 'success');
+        renderDashboard();
+    } catch (e) {
+        console.error('Error in confirmEndSessionWithPayment:', e);
+        showToast(t('حصل خطأ، حاول تاني.', 'Error, try again.'), 'error');
+    }
 }
 
 // ============================================================
@@ -909,105 +1343,178 @@ function openExpenseSheet() { document.getElementById('expenseDesc').value = '';
 async function submitExpense() {
     const description = document.getElementById('expenseDesc').value.trim();
     const amount = parseFloat(document.getElementById('expenseAmount').value);
-    if (!description || !amount) { document.getElementById('expenseError').textContent = 'اكمل البيانات.'; return; }
+    if (!description || !amount) { document.getElementById('expenseError').textContent = t('اكمل البيانات.', 'Complete the data.'); return; }
     await supabaseClient.from('expenses').insert({ business_id: business.id, shift_id: currentShift.id, description, amount });
     closeSheet('expenseOverlay');
-    showToast('تم تسجيل المصروف', 'success');
+    showToast(t('تم تسجيل المصروف', 'Expense recorded'), 'success');
     renderDashboard();
     if (document.getElementById('view-shift').classList.contains('active')) renderShiftView();
 }
 
 // ============================================================
-// SHIFT
+// SHIFT - VERSION WITH FIXED HISTORY
 // ============================================================
 async function getShiftTotals(shift) {
-    const { data: sessRows } = await supabaseClient.from('sessions').select('amount').eq('business_id', business.id).eq('status', 'completed').gte('started_at', shift.opened_at).lte('started_at', shift.closed_at || new Date().toISOString());
-    const revenue = (sessRows || []).reduce((s, r) => s + Number(r.amount || 0), 0);
-    const { data: expRows } = await supabaseClient.from('expenses').select('description, amount').eq('shift_id', shift.id);
-    const expenses = (expRows || []).reduce((s, r) => s + Number(r.amount), 0);
-    return { revenue, expenses, profit: revenue - expenses, expenseRows: expRows || [] };
+    try {
+        const { data: sessRows } = await supabaseClient
+            .from('sessions')
+            .select('amount, payment_method')
+            .eq('business_id', business.id)
+            .eq('status', 'completed')
+            .gte('started_at', shift.opened_at)
+            .lte('started_at', shift.closed_at || new Date().toISOString());
+        
+        const revenue = (sessRows || []).reduce((s, r) => s + (Number(r.amount) || 0), 0);
+        
+        const { data: expRows } = await supabaseClient
+            .from('expenses')
+            .select('description, amount')
+            .eq('shift_id', shift.id);
+        
+        const expenses = (expRows || []).reduce((s, r) => s + Number(r.amount || 0), 0);
+        
+        return { 
+            revenue, 
+            expenses, 
+            profit: revenue - expenses, 
+            expenseRows: expRows || [], 
+            sessions: sessRows || [] 
+        };
+    } catch (e) {
+        console.error('Error getting shift totals:', e);
+        return { revenue: 0, expenses: 0, profit: 0, expenseRows: [], sessions: [] };
+    }
 }
 
 async function renderShiftView() {
+    // Current shift
     const totals = await getShiftTotals(currentShift);
     document.getElementById('shiftSummary').innerHTML = `
-        <div class="list-row"><div class="row-title">وقت الفتح</div><div class="row-value mono">${new Date(currentShift.opened_at).toLocaleTimeString('ar-EG')}</div></div>
-        <div class="list-row"><div class="row-title">الإيراد</div><div class="row-value mono">${money(totals.revenue)}</div></div>
-        <div class="list-row"><div class="row-title">المصروفات</div><div class="row-value mono">${money(totals.expenses)}</div></div>
-        <div class="list-row"><div class="row-title">الصافي</div><div class="row-value mono" style="color:var(--amber);">${money(totals.profit)}</div></div>`;
+        <div class="list-row"><div class="row-title">${t('وقت الفتح', 'Opened At')}</div><div class="row-value mono">${new Date(currentShift.opened_at).toLocaleTimeString(currentLang === 'ar' ? 'ar-EG' : 'en-US')}</div></div>
+        <div class="list-row"><div class="row-title">${t('الإيراد', 'Revenue')}</div><div class="row-value mono">${money(totals.revenue)}</div></div>
+        <div class="list-row"><div class="row-title">${t('المصروفات', 'Expenses')}</div><div class="row-value mono">${money(totals.expenses)}</div></div>
+        <div class="list-row"><div class="row-title">${t('الصافي', 'Net Income')}</div><div class="row-value mono" style="color:var(--amber);">${money(totals.profit)}</div></div>`;
 
-    const { data: pastShifts } = await supabaseClient.from('shifts').select('*').eq('business_id', business.id).eq('status', 'closed').order('closed_at', { ascending: false }).limit(15);
+    // Payment method breakdown
+    const pmBreakdown = {};
+    totals.sessions.forEach(s => {
+        if (s.payment_method) {
+            const pm = paymentMethods.find(p => p.id === s.payment_method);
+            const key = pm ? pm.name : s.payment_method;
+            pmBreakdown[key] = (pmBreakdown[key] || 0) + Number(s.amount || 0);
+        }
+    });
+    if (Object.keys(pmBreakdown).length > 0) {
+        let pmHtml = `<div style="margin-top:12px;padding-top:12px;border-top:1px solid var(--border);">`;
+        pmHtml += `<div style="font-size:12px;color:var(--text-dim);font-weight:600;margin-bottom:6px;">${t('توزيع الإيراد حسب طريقة الدفع', 'Revenue by Payment Method')}</div>`;
+        Object.entries(pmBreakdown).forEach(([name, amount]) => {
+            pmHtml += `<div class="list-row" style="padding:6px 0;"><div class="row-title" style="font-size:13px;">${escapeHtml(name)}</div><div class="row-value mono" style="font-size:14px;">${money(amount)}</div></div>`;
+        });
+        pmHtml += `</div>`;
+        document.getElementById('shiftSummary').innerHTML += pmHtml;
+    }
+
+    // Closed shifts history
+    const { data: pastShifts } = await supabaseClient
+        .from('shifts')
+        .select('*')
+        .eq('business_id', business.id)
+        .eq('status', 'closed')
+        .order('closed_at', { ascending: false })
+        .limit(15);
+    
     const histEl = document.getElementById('shiftHistory');
-    histEl.innerHTML = (pastShifts || []).length === 0
-        ? '<div class="empty"><i class="fa-solid fa-clock-rotate-left"></i>لسه مفيش شيفتات مقفولة</div>'
-        : pastShifts.map(s => `<div class="list-row">
-            <div><div class="row-title">${new Date(s.closed_at).toLocaleDateString('ar-EG')}</div><div class="row-sub">صافي ${money(s.total_profit)} ج</div></div>
-            <button class="btn btn-ghost btn-sm" onclick="exportShiftPDF('${s.id}')"><i class="fa-solid fa-file-pdf"></i> PDF</button>
-        </div>`).join('');
+    
+    if (!pastShifts || pastShifts.length === 0) {
+        histEl.innerHTML = `<div class="empty"><i class="fa-solid fa-clock-rotate-left"></i>${t('لسه مفيش شيفتات مقفولة', 'No closed shifts yet')}</div>`;
+        return;
+    }
+
+    let historyHtml = '';
+    for (const shift of pastShifts) {
+        const shiftTotals = await getShiftTotals(shift);
+        const dateStr = new Date(shift.closed_at).toLocaleDateString(currentLang === 'ar' ? 'ar-EG' : 'en-US');
+        const revLabel = t('إيراد', 'Revenue');
+        const expLabel = t('مصروفات', 'Expenses');
+        const netLabel = t('صافي الدخل', 'Net Income');
+        
+        historyHtml += `
+            <div class="list-row" style="flex-direction:column;align-items:stretch;padding:12px 4px;border-bottom:1px solid var(--border);">
+                <div style="display:flex;justify-content:space-between;width:100%;margin-bottom:6px;">
+                    <div class="row-title">${dateStr}</div>
+                    <div style="display:flex;gap:16px;font-size:12px;color:var(--text-dim);">
+                        <span>${revLabel} <span class="mono" style="color:var(--text);">${money(shiftTotals.revenue)}</span></span>
+                        <span>${expLabel} <span class="mono" style="color:var(--text);">${money(shiftTotals.expenses)}</span></span>
+                    </div>
+                </div>
+                <div style="display:flex;justify-content:space-between;width:100%;">
+                    <div style="font-size:12px;color:var(--text-faint);">${netLabel}</div>
+                    <div class="mono" style="font-weight:700;color:var(--amber);">${money(shiftTotals.profit)} ${t('ج', 'EGP')}</div>
+                </div>
+            </div>
+        `;
+    }
+    histEl.innerHTML = historyHtml;
 }
 
 async function openCloseShiftSheet() {
     const totals = await getShiftTotals(currentShift);
     document.getElementById('closeShiftSummary').innerHTML = `
-        <div class="list-row"><div class="row-title">الإيراد</div><div class="row-value mono">${money(totals.revenue)}</div></div>
-        <div class="list-row"><div class="row-title">المصروفات</div><div class="row-value mono">${money(totals.expenses)}</div></div>
-        <div class="list-row"><div class="row-title">الصافي</div><div class="row-value mono">${money(totals.profit)}</div></div>
-        <div class="list-row"><div class="row-title">أجهزة لسه شغالة</div><div class="row-value mono">${Object.keys(sessions).length}</div></div>`;
+        <div class="list-row"><div class="row-title">${t('الإيراد', 'Revenue')}</div><div class="row-value mono">${money(totals.revenue)}</div></div>
+        <div class="list-row"><div class="row-title">${t('المصروفات', 'Expenses')}</div><div class="row-value mono">${money(totals.expenses)}</div></div>
+        <div class="list-row"><div class="row-title">${t('الصافي', 'Net Income')}</div><div class="row-value mono">${money(totals.profit)}</div></div>
+        <div class="list-row"><div class="row-title">${t('أجهزة لسه شغالة', 'Active Devices')}</div><div class="row-value mono">${Object.keys(sessions).length}</div></div>`;
     openSheet('closeShiftOverlay');
 }
 
 async function confirmCloseShift() {
     const totals = await getShiftTotals(currentShift);
     const closedAt = new Date().toISOString();
-    await supabaseClient.from('shifts').update({ status: 'closed', closed_at: closedAt, total_revenue: totals.revenue, total_expenses: totals.expenses, total_profit: totals.profit, closed_by: currentUser.name || currentUser.type }).eq('id', currentShift.id);
+    
+    const { error } = await supabaseClient
+        .from('shifts')
+        .update({ 
+            status: 'closed', 
+            closed_at: closedAt, 
+            total_revenue: totals.revenue, 
+            total_expenses: totals.expenses, 
+            total_profit: totals.profit, 
+            closed_by: currentUser.name || currentUser.type 
+        })
+        .eq('id', currentShift.id);
+    
+    if (error) {
+        showToast(t('فشل إقفال الشيفت', 'Failed to close shift'), 'error');
+        console.error('Error closing shift:', error);
+        return;
+    }
+    
     closeSheet('closeShiftOverlay');
-    showToast('تم إقفال الشيفت', 'success');
+    showToast(t('تم إقفال الشيفت', 'Shift closed'), 'success');
     await loadOrOpenShift();
-    renderShiftView(); renderDashboard();
-}
-
-// PDF export uses the browser's native print-to-PDF instead of a JS PDF
-// library — jsPDF's built-in fonts don't support Arabic glyphs, so a
-// generated PDF would show broken boxes instead of text. Print rendering
-// uses the page's real Arabic font, and "Save as PDF" in the print dialog
-// works the same on desktop and mobile.
-async function exportShiftPDF(shiftId) {
-    const { data: shift } = await supabaseClient.from('shifts').select('*').eq('id', shiftId).single();
-    const totals = await getShiftTotals(shift);
-    const area = document.getElementById('printArea');
-    area.innerHTML = `
-        <div style="font-family:'Cairo',sans-serif;direction:rtl;padding:24px;color:#000;">
-            <h2 style="margin-bottom:4px;">${escapeHtml(business.name)}</h2>
-            <div style="color:#555;margin-bottom:20px;">تقرير شيفت — ${new Date(shift.opened_at).toLocaleString('ar-EG')} إلى ${new Date(shift.closed_at).toLocaleString('ar-EG')}</div>
-            <table style="width:100%;border-collapse:collapse;margin-bottom:20px;">
-                <tr><td style="padding:8px;border:1px solid #ccc;">الإيراد</td><td style="padding:8px;border:1px solid #ccc;">${money(totals.revenue)} ج</td></tr>
-                <tr><td style="padding:8px;border:1px solid #ccc;">المصروفات</td><td style="padding:8px;border:1px solid #ccc;">${money(totals.expenses)} ج</td></tr>
-                <tr><td style="padding:8px;border:1px solid #ccc;font-weight:bold;">الصافي</td><td style="padding:8px;border:1px solid #ccc;font-weight:bold;">${money(totals.profit)} ج</td></tr>
-            </table>
-            <h3 style="margin-bottom:8px;">المصروفات بالتفصيل</h3>
-            <table style="width:100%;border-collapse:collapse;">
-                ${totals.expenseRows.length ? totals.expenseRows.map(e => `<tr><td style="padding:6px;border:1px solid #ccc;">${escapeHtml(e.description)}</td><td style="padding:6px;border:1px solid #ccc;">${money(e.amount)} ج</td></tr>`).join('') : '<tr><td style="padding:6px;">مفيش مصروفات</td></tr>'}
-            </table>
-        </div>`;
-    window.print();
+    renderShiftView(); 
+    renderDashboard();
 }
 
 // ============================================================
-// SETTINGS — subscription, menu items, employees
+// SETTINGS
 // ============================================================
 function renderSettings() {
     const expiry = deviceRecord.expiry_date ? new Date(deviceRecord.expiry_date) : null;
     document.getElementById('settingsSubscription').innerHTML = `
-        <div class="list-row"><div class="row-title">حالة الجهاز</div><div class="badge ${deviceRecord.revoked ? 'badge-red' : 'badge-teal'}">${deviceRecord.revoked ? 'موقوف' : 'نشط'}</div></div>
-        <div class="list-row"><div class="row-title">تاريخ الانتهاء</div><div class="row-value mono">${expiry ? expiry.toLocaleDateString('ar-EG') : '—'}</div></div>`;
+        <div class="list-row"><div class="row-title">${t('حالة الجهاز', 'Device Status')}</div><div class="badge ${deviceRecord.revoked ? 'badge-red' : 'badge-teal'}">${deviceRecord.revoked ? t('موقوف', 'Suspended') : t('نشط', 'Active')}</div></div>
+        <div class="list-row"><div class="row-title">${t('تاريخ الانتهاء', 'Expiry Date')}</div><div class="row-value mono">${expiry ? expiry.toLocaleDateString(currentLang === 'ar' ? 'ar-EG' : 'en-US') : '—'}</div></div>`;
 
     document.getElementById('settingsMenu').innerHTML = menuItems.length === 0
-        ? '<div class="empty"><i class="fa-solid fa-utensils"></i>لسه مفيش أصناف</div>'
-        : menuItems.map(m => `<div class="list-row"><div><div class="row-title">${escapeHtml(m.name)}</div><div class="row-sub">${m.category === 'food' ? 'أكل' : m.category === 'drink' ? 'مشروب' : 'أخرى'}</div></div><div class="row-value mono">${money(m.price)}</div></div>`).join('');
+        ? `<div class="empty"><i class="fa-solid fa-utensils"></i>${t('لسه مفيش أصناف', 'No items yet')}</div>`
+        : menuItems.map(m => {
+            const catMap = { 'food': t('أكل', 'Food'), 'drink': t('مشروب', 'Drink'), 'other': t('أخرى', 'Other') };
+            return `<div class="list-row"><div><div class="row-title">${escapeHtml(m.name)}</div><div class="row-sub">${catMap[m.category] || m.category}</div></div><div class="row-value mono">${money(m.price)}</div></div>`;
+        }).join('');
 
     document.getElementById('settingsEmployees').innerHTML = employees.length === 0
-        ? '<div class="empty"><i class="fa-solid fa-user-group"></i>لسه مفيش موظفين</div>'
-        : employees.map(e => `<div class="list-row"><div class="row-title">${escapeHtml(e.name)}</div><div class="badge ${e.active ? 'badge-teal' : 'badge-red'}">${e.active ? 'نشط' : 'موقوف'}</div></div>`).join('');
+        ? `<div class="empty"><i class="fa-solid fa-user-group"></i>${t('لسه مفيش موظفين', 'No employees yet')}</div>`
+        : employees.map(e => `<div class="list-row"><div class="row-title">${escapeHtml(e.name)}</div><div class="badge ${e.active ? 'badge-teal' : 'badge-red'}">${e.active ? t('نشط', 'Active') : t('موقوف', 'Inactive')}</div></div>`).join('');
 }
 
 function openMenuItemSheet() { document.getElementById('menuItemName').value = ''; document.getElementById('menuItemPrice').value = ''; document.getElementById('menuItemError').textContent = ''; openSheet('menuItemOverlay'); }
@@ -1015,9 +1522,9 @@ async function submitMenuItem() {
     const name = document.getElementById('menuItemName').value.trim();
     const price = parseFloat(document.getElementById('menuItemPrice').value);
     const category = document.getElementById('menuItemCategory').value;
-    if (!name || isNaN(price)) { document.getElementById('menuItemError').textContent = 'اكمل البيانات.'; return; }
+    if (!name || isNaN(price)) { document.getElementById('menuItemError').textContent = t('اكمل البيانات.', 'Complete the data.'); return; }
     await supabaseClient.from('menu_items').insert({ business_id: business.id, name, price, category });
-    closeSheet('menuItemOverlay'); showToast('تمت الإضافة', 'success');
+    closeSheet('menuItemOverlay'); showToast(t('تمت الإضافة', 'Item added'), 'success');
     await loadMenuItems(); renderSettings();
 }
 
@@ -1025,16 +1532,17 @@ function openEmployeeSheet() { document.getElementById('employeeName').value = '
 async function submitEmployee() {
     const name = document.getElementById('employeeName').value.trim();
     const pin = document.getElementById('employeePin').value.trim();
-    if (!name || !/^\d{4,6}$/.test(pin)) { document.getElementById('employeeError').textContent = 'اكتب اسم و PIN من 4 لـ 6 أرقام.'; return; }
+    if (!name || !/^\d{4,6}$/.test(pin)) { document.getElementById('employeeError').textContent = t('اكتب اسم و PIN من 4 لـ 6 أرقام.', 'Enter name and 4-6 digit PIN.'); return; }
     const permissions = {
         stations: document.getElementById('permStations').checked,
-        inventory: document.getElementById('permInventory').checked,
         shift: document.getElementById('permShift').checked
     };
     await supabaseClient.from('employees').insert({ business_id: business.id, name, pin, permissions });
-    closeSheet('employeeOverlay'); showToast('تمت إضافة الموظف', 'success');
+    closeSheet('employeeOverlay'); showToast(t('تمت إضافة الموظف', 'Employee added'), 'success');
     await loadEmployees(); renderSettings();
 }
+
+function escapeHtml(str) { const d = document.createElement('div'); d.textContent = str ?? ''; return d.innerHTML; }
 </script>
 
 </body>
