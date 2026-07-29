@@ -255,6 +255,37 @@ button:focus-visible, a:focus-visible, input:focus-visible, select:focus-visible
 .lang-toggle:hover {
     border-color: var(--border-strong);
 }
+
+/* ---------- shift filter tabs ---------- */
+.shift-tabs {
+    display: flex;
+    gap: 6px;
+    margin-bottom: 12px;
+    flex-wrap: wrap;
+}
+.shift-tab {
+    background: var(--bg-sunken);
+    border: 1px solid var(--border);
+    border-radius: var(--radius-sm);
+    color: var(--text-dim);
+    padding: 8px 16px;
+    font-size: 12px;
+    font-weight: 700;
+    cursor: pointer;
+    transition: all 0.2s var(--ease);
+    flex: 1;
+    text-align: center;
+    min-width: 60px;
+}
+.shift-tab:hover {
+    border-color: var(--border-strong);
+    color: var(--text);
+}
+.shift-tab.active {
+    border-color: var(--amber);
+    color: var(--amber);
+    background: var(--amber-dim);
+}
 </style>
 </head>
 <body>
@@ -362,7 +393,16 @@ button:focus-visible, a:focus-visible, input:focus-visible, select:focus-visible
         <button class="btn btn-red btn-block" style="margin-top:14px;" onclick="openCloseShiftSheet()">
             <i class="fa-solid fa-lock"></i> <span data-ar="إقفال الشيفت" data-en="Close Shift">إقفال الشيفت</span>
         </button>
+        
         <div class="section-title" data-ar="سجل الشيفتات" data-en="Shift History">سجل الشيفتات</div>
+        
+        <!-- فلتر الشيفتات -->
+        <div class="shift-tabs">
+            <button class="shift-tab active" data-filter="all" onclick="setShiftFilter('all')">كل الشيفتات</button>
+            <button class="shift-tab" data-filter="weekly" onclick="setShiftFilter('weekly')">أسبوعي</button>
+            <button class="shift-tab" data-filter="monthly" onclick="setShiftFilter('monthly')">شهري</button>
+        </div>
+        
         <div class="panel" id="shiftHistory"></div>
     </div>
 
@@ -478,14 +518,27 @@ button:focus-visible, a:focus-visible, input:focus-visible, select:focus-visible
     </div>
 </div>
 
-<!-- ============== EXPENSE SHEET ============== -->
+<!-- ============== EXPENSE SHEET - مع علامة X للإغلاق ============== -->
 <div class="overlay" id="expenseOverlay">
     <div class="sheet">
         <div class="sheet-handle"></div>
-        <div class="sheet-title" data-ar="إضافة مصروف" data-en="Add Expense">إضافة مصروف<button class="close-x" onclick="closeSheet('expenseOverlay')"><i class="fa-solid fa-xmark"></i></button></div>
-        <div class="field"><label data-ar="الوصف" data-en="Description">الوصف</label><input type="text" id="expenseDesc" placeholder="مثال: فاتورة كهرباء"></div>
-        <div class="field"><label data-ar="المبلغ" data-en="Amount">المبلغ</label><input type="number" id="expenseAmount" class="mono" placeholder="0"></div>
-        <button class="btn btn-amber btn-block" onclick="submitExpense()"><span data-ar="حفظ" data-en="Save">حفظ</span></button>
+        <div class="sheet-title">
+            <span data-ar="إضافة مصروف" data-en="Add Expense">إضافة مصروف</span>
+            <button class="close-x" onclick="closeSheet('expenseOverlay')">
+                <i class="fa-solid fa-xmark"></i>
+            </button>
+        </div>
+        <div class="field">
+            <label data-ar="الوصف" data-en="Description">الوصف</label>
+            <input type="text" id="expenseDesc" placeholder="مثال: فاتورة كهرباء">
+        </div>
+        <div class="field">
+            <label data-ar="المبلغ" data-en="Amount">المبلغ</label>
+            <input type="number" id="expenseAmount" class="mono" placeholder="0">
+        </div>
+        <button class="btn btn-amber btn-block" onclick="submitExpense()">
+            <span data-ar="حفظ" data-en="Save">حفظ</span>
+        </button>
         <div class="error-text" id="expenseError"></div>
     </div>
 </div>
@@ -550,6 +603,7 @@ const supabaseClient = window.supabase.createClient(SUPABASE_URL, SUPABASE_ANON_
 // LANGUAGE STATE
 // ============================================================
 let currentLang = 'ar';
+let shiftFilter = 'all'; // 'all', 'weekly', 'monthly'
 
 function toggleLanguage() {
     currentLang = currentLang === 'ar' ? 'en' : 'ar';
@@ -571,6 +625,14 @@ function updateTexts() {
     renderSettingsPaymentMethods();
     if (document.getElementById('view-shift').classList.contains('active')) renderShiftView();
     if (document.getElementById('view-settings').classList.contains('active')) renderSettings();
+}
+
+function setShiftFilter(filter) {
+    shiftFilter = filter;
+    document.querySelectorAll('.shift-tab').forEach(tab => {
+        tab.classList.toggle('active', tab.dataset.filter === filter);
+    });
+    renderShiftView();
 }
 
 // ============================================================
@@ -1352,7 +1414,7 @@ async function submitExpense() {
 }
 
 // ============================================================
-// SHIFT - VERSION WITH FIXED HISTORY
+// SHIFT - مع سجل أسبوعي وشهري وزر حذف
 // ============================================================
 async function getShiftTotals(shift) {
     try {
@@ -1414,19 +1476,35 @@ async function renderShiftView() {
         document.getElementById('shiftSummary').innerHTML += pmHtml;
     }
 
-    // Closed shifts history
-    const { data: pastShifts } = await supabaseClient
+    // Closed shifts with filter
+    let query = supabaseClient
         .from('shifts')
         .select('*')
         .eq('business_id', business.id)
         .eq('status', 'closed')
-        .order('closed_at', { ascending: false })
-        .limit(15);
+        .order('closed_at', { ascending: false });
+    
+    // Apply filter
+    const now = new Date();
+    if (shiftFilter === 'weekly') {
+        const weekAgo = new Date(now);
+        weekAgo.setDate(weekAgo.getDate() - 7);
+        query = query.gte('closed_at', weekAgo.toISOString());
+    } else if (shiftFilter === 'monthly') {
+        const monthAgo = new Date(now);
+        monthAgo.setDate(monthAgo.getDate() - 30);
+        query = query.gte('closed_at', monthAgo.toISOString());
+    }
+    
+    const { data: pastShifts } = await query.limit(50);
     
     const histEl = document.getElementById('shiftHistory');
     
     if (!pastShifts || pastShifts.length === 0) {
-        histEl.innerHTML = `<div class="empty"><i class="fa-solid fa-clock-rotate-left"></i>${t('لسه مفيش شيفتات مقفولة', 'No closed shifts yet')}</div>`;
+        const filterLabel = shiftFilter === 'all' ? t('كل الشيفتات', 'All shifts') : 
+                           shiftFilter === 'weekly' ? t('الآسبوع الماضي', 'Last week') : 
+                           t('الشهر الماضي', 'Last month');
+        histEl.innerHTML = `<div class="empty"><i class="fa-solid fa-clock-rotate-left"></i>${t('مفيش شيفتات مقفولة في ', 'No closed shifts in ')} ${filterLabel}</div>`;
         return;
     }
 
@@ -1434,6 +1512,7 @@ async function renderShiftView() {
     for (const shift of pastShifts) {
         const shiftTotals = await getShiftTotals(shift);
         const dateStr = new Date(shift.closed_at).toLocaleDateString(currentLang === 'ar' ? 'ar-EG' : 'en-US');
+        const timeStr = new Date(shift.closed_at).toLocaleTimeString(currentLang === 'ar' ? 'ar-EG' : 'en-US', { hour: '2-digit', minute: '2-digit' });
         const revLabel = t('إيراد', 'Revenue');
         const expLabel = t('مصروفات', 'Expenses');
         const netLabel = t('صافي الدخل', 'Net Income');
@@ -1441,10 +1520,15 @@ async function renderShiftView() {
         historyHtml += `
             <div class="list-row" style="flex-direction:column;align-items:stretch;padding:12px 4px;border-bottom:1px solid var(--border);">
                 <div style="display:flex;justify-content:space-between;width:100%;margin-bottom:6px;">
-                    <div class="row-title">${dateStr}</div>
-                    <div style="display:flex;gap:16px;font-size:12px;color:var(--text-dim);">
-                        <span>${revLabel} <span class="mono" style="color:var(--text);">${money(shiftTotals.revenue)}</span></span>
-                        <span>${expLabel} <span class="mono" style="color:var(--text);">${money(shiftTotals.expenses)}</span></span>
+                    <div class="row-title">${dateStr} - ${timeStr}</div>
+                    <div style="display:flex;gap:8px;align-items:center;">
+                        <div style="display:flex;gap:12px;font-size:12px;color:var(--text-dim);">
+                            <span>${revLabel} <span class="mono" style="color:var(--text);">${money(shiftTotals.revenue)}</span></span>
+                            <span>${expLabel} <span class="mono" style="color:var(--text);">${money(shiftTotals.expenses)}</span></span>
+                        </div>
+                        <button class="btn btn-danger-sm" onclick="deleteShift('${shift.id}')" title="${t('حذف الشيفت', 'Delete shift')}" style="padding:4px 8px;font-size:11px;">
+                            <i class="fa-solid fa-xmark"></i>
+                        </button>
                     </div>
                 </div>
                 <div style="display:flex;justify-content:space-between;width:100%;">
@@ -1455,6 +1539,43 @@ async function renderShiftView() {
         `;
     }
     histEl.innerHTML = historyHtml;
+}
+
+// ============================================================
+// حذف الشيفت
+// ============================================================
+async function deleteShift(shiftId) {
+    if (!confirm(t('هل أنت متأكد من حذف هذا الشيفت؟ سيتم حذف كل الجلسات والمصروفات المرتبطة به.', 'Are you sure you want to delete this shift? All sessions and expenses associated with it will be deleted.'))) return;
+    
+    try {
+        // حذف المصروفات المرتبطة
+        await supabaseClient.from('expenses').delete().eq('shift_id', shiftId);
+        
+        // حذف الجلسات المرتبطة بالشيفت (جيب الجلسات الأول)
+        const { data: sessionsToDelete } = await supabaseClient
+            .from('sessions')
+            .select('id')
+            .eq('business_id', business.id)
+            .eq('status', 'completed');
+        
+        if (sessionsToDelete && sessionsToDelete.length > 0) {
+            const sessionIds = sessionsToDelete.map(s => s.id);
+            // حذف طلبات الجلسات
+            await supabaseClient.from('session_orders').delete().in('session_id', sessionIds);
+            // حذف الجلسات
+            await supabaseClient.from('sessions').delete().in('id', sessionIds);
+        }
+        
+        // حذف الشيفت نفسه
+        await supabaseClient.from('shifts').delete().eq('id', shiftId);
+        
+        showToast(t('تم حذف الشيفت', 'Shift deleted'), 'success');
+        renderShiftView();
+        renderDashboard();
+    } catch (e) {
+        console.error('Error deleting shift:', e);
+        showToast(t('فشل حذف الشيفت', 'Failed to delete shift'), 'error');
+    }
 }
 
 async function openCloseShiftSheet() {
