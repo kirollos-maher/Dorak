@@ -340,13 +340,49 @@ button:focus-visible, a:focus-visible, input:focus-visible, select:focus-visible
         <div class="brand-mark" id="lockBizCode">—</div>
         <div class="brand-title" id="lockBizName">—</div>
         <div class="card">
-            <div class="field">
-                <label data-ar="PIN المالك أو الموظف" data-en="Owner or Employee PIN">PIN المالك أو الموظف</label>
-                <input type="password" inputmode="numeric" id="lockPinInput" class="mono" placeholder="••••" style="text-align:center;letter-spacing:0.4em;font-size:22px;">
+            <!-- الخطوة 1: اختيار الدور -->
+            <div id="lockRoleChoice">
+                <label data-ar="هل انت؟" data-en="Are you?" style="display:block;margin-bottom:10px;">هل انت؟</label>
+                <button class="btn btn-block" style="margin-bottom:10px;" onclick="selectLockRole('owner')">
+                    <i class="fa-solid fa-user-shield"></i> <span data-ar="المالك / الأدمن" data-en="Owner / Admin">المالك / الأدمن</span>
+                </button>
+                <button class="btn btn-block" onclick="selectLockRole('employee')">
+                    <i class="fa-solid fa-user"></i> <span data-ar="موظف" data-en="Employee">موظف</span>
+                </button>
             </div>
-            <button class="btn btn-amber btn-block" onclick="handleUnlock()">
-                <i class="fa-solid fa-unlock"></i> <span data-ar="دخول" data-en="Enter">دخول</span>
-            </button>
+
+            <!-- الخطوة 2 أ: دخول المالك بالـ PIN (زي ما كان بالظبط) -->
+            <div id="lockOwnerForm" style="display:none;">
+                <div class="field">
+                    <label data-ar="PIN المالك" data-en="Owner PIN">PIN المالك</label>
+                    <input type="password" inputmode="numeric" id="lockPinInput" class="mono" placeholder="••••" style="text-align:center;letter-spacing:0.4em;font-size:22px;">
+                </div>
+                <button class="btn btn-amber btn-block" onclick="handleUnlock()">
+                    <i class="fa-solid fa-unlock"></i> <span data-ar="دخول" data-en="Enter">دخول</span>
+                </button>
+                <button class="btn btn-block" style="margin-top:10px;" onclick="resetLockRole()">
+                    <i class="fa-solid fa-arrow-right"></i> <span data-ar="رجوع" data-en="Back">رجوع</span>
+                </button>
+            </div>
+
+            <!-- الخطوة 2 ب: دخول الموظف بالاسم + الـ PIN بتاعه -->
+            <div id="lockEmployeeForm" style="display:none;">
+                <div class="field">
+                    <label data-ar="اسمك" data-en="Your Name">اسمك</label>
+                    <input type="text" id="lockEmpName" placeholder="">
+                </div>
+                <div class="field">
+                    <label data-ar="PIN الموظف" data-en="Employee PIN">PIN الموظف</label>
+                    <input type="password" inputmode="numeric" id="lockEmpPin" class="mono" placeholder="••••" style="text-align:center;letter-spacing:0.4em;font-size:22px;">
+                </div>
+                <button class="btn btn-amber btn-block" onclick="handleEmployeeUnlock()">
+                    <i class="fa-solid fa-unlock"></i> <span data-ar="دخول" data-en="Enter">دخول</span>
+                </button>
+                <button class="btn btn-block" style="margin-top:10px;" onclick="resetLockRole()">
+                    <i class="fa-solid fa-arrow-right"></i> <span data-ar="رجوع" data-en="Back">رجوع</span>
+                </button>
+            </div>
+
             <div class="error-text" id="lockError"></div>
         </div>
         <div style="margin-top:14px;font-size:12px;color:var(--text-faint);" class="mono" id="subStatusLine"></div>
@@ -408,8 +444,15 @@ button:focus-visible, a:focus-visible, input:focus-visible, select:focus-visible
 
     <!-- ---------- SETTINGS ---------- -->
     <div class="view" id="view-settings">
-        <div class="section-title" data-ar="الأجهزة" data-en="Devices">الأجهزة</div>
-        <div class="panel" id="settingsStations"></div>
+        <div class="section-title" style="cursor:pointer;display:flex;align-items:center;justify-content:space-between;" onclick="toggleSettingsStations()">
+            <span><span data-ar="الأجهزة" data-en="Devices">الأجهزة</span> <span id="settingsStationsCount" class="mono" style="color:var(--text-dim);font-weight:400;font-size:12px;"></span></span>
+            <i class="fa-solid fa-chevron-down" id="settingsStationsChevron" style="transition:transform .2s;"></i>
+        </div>
+        <div class="panel" id="settingsStations" style="display:none;"></div>
+        <div class="panel" style="margin-top:8px;display:flex;gap:8px;align-items:center;">
+            <input type="number" id="bulkRateInput" class="mono" placeholder="السعر بالجنيه/ساعة" style="flex:1;background:var(--bg);border:1px solid var(--border);color:var(--text);border-radius:8px;padding:10px;">
+            <button class="btn btn-amber" onclick="applyBulkRate()" style="white-space:nowrap;"><i class="fa-solid fa-check-double"></i> <span data-ar="تثبيت لكل الأجهزة" data-en="Apply to All">تثبيت لكل الأجهزة</span></button>
+        </div>
         <button class="btn btn-ghost btn-block" style="margin-top:8px;" onclick="openStationManagementSheet()"><i class="fa-solid fa-plus"></i> <span data-ar="إضافة جهاز" data-en="Add Device">إضافة جهاز</span></button>
 
         <div class="section-title" data-ar="طرق الدفع" data-en="Payment Methods">طرق الدفع</div>
@@ -547,7 +590,7 @@ button:focus-visible, a:focus-visible, input:focus-visible, select:focus-visible
 <div class="overlay" id="menuItemOverlay">
     <div class="sheet">
         <div class="sheet-handle"></div>
-        <div class="sheet-title" data-ar="إضافة صنف للقائمة" data-en="Add Menu Item">إضافة صنف للقائمة<button class="close-x" onclick="closeSheet('menuItemOverlay')"><i class="fa-solid fa-xmark"></i></button></div>
+        <div class="sheet-title"><span data-ar="إضافة صنف للقائمة" data-en="Add Menu Item">إضافة صنف للقائمة</span><button class="close-x" onclick="closeSheet('menuItemOverlay')"><i class="fa-solid fa-xmark"></i></button></div>
         <div class="field"><label data-ar="اسم الصنف" data-en="Item Name">اسم الصنف</label><input type="text" id="menuItemName"></div>
         <div class="field"><label data-ar="السعر" data-en="Price">السعر</label><input type="number" id="menuItemPrice" class="mono"></div>
         <div class="field"><label data-ar="النوع" data-en="Category">النوع</label>
@@ -562,13 +605,14 @@ button:focus-visible, a:focus-visible, input:focus-visible, select:focus-visible
 <div class="overlay" id="employeeOverlay">
     <div class="sheet">
         <div class="sheet-handle"></div>
-        <div class="sheet-title" data-ar="إضافة موظف" data-en="Add Employee">إضافة موظف<button class="close-x" onclick="closeSheet('employeeOverlay')"><i class="fa-solid fa-xmark"></i></button></div>
+        <div class="sheet-title"><span data-ar="إضافة موظف" data-en="Add Employee">إضافة موظف</span><button class="close-x" onclick="closeSheet('employeeOverlay')"><i class="fa-solid fa-xmark"></i></button></div>
         <div class="field"><label data-ar="الاسم" data-en="Name">الاسم</label><input type="text" id="employeeName"></div>
         <div class="field"><label data-ar="PIN (4 أرقام)" data-en="PIN (4 digits)">PIN (4 أرقام)</label><input type="text" inputmode="numeric" maxlength="6" id="employeePin" class="mono"></div>
         <div class="field">
             <label data-ar="الصلاحيات" data-en="Permissions">الصلاحيات</label>
             <label style="display:flex;align-items:center;gap:8px;font-weight:500;color:var(--text);margin-bottom:6px;"><input type="checkbox" id="permStations" checked> <span data-ar="إدارة الأجهزة والجلسات" data-en="Manage devices & sessions">إدارة الأجهزة والجلسات</span></label>
-            <label style="display:flex;align-items:center;gap:8px;font-weight:500;color:var(--text);"><input type="checkbox" id="permShift"> <span data-ar="إقفال الشيفت" data-en="Close shift">إقفال الشيفت</span></label>
+            <label style="display:flex;align-items:center;gap:8px;font-weight:500;color:var(--text);margin-bottom:6px;"><input type="checkbox" id="permShift"> <span data-ar="إقفال الشيفت" data-en="Close shift">إقفال الشيفت</span></label>
+            <label style="display:flex;align-items:center;gap:8px;font-weight:500;color:var(--text);"><input type="checkbox" id="permSettings"> <span data-ar="الدخول والتعديل في الإعدادات" data-en="Access & edit Settings">الدخول والتعديل في الإعدادات</span></label>
         </div>
         <p style="font-size:11.5px;color:var(--text-faint);margin-bottom:12px;" data-ar="ملاحظة أمان: الـ PIN مخزّن كنص عادي حاليًا لأن التطبيق مفيش له باك إند منفصل — مناسب لتحكم داخلي بسيط، مش بديل عن نظام مستخدمين حقيقي." data-en="Security note: PIN is stored as plain text currently as the app has no separate backend — suitable for simple internal control, not a replacement for a real user system.">
             ملاحظة أمان: الـ PIN مخزّن كنص عادي حاليًا لأن التطبيق مفيش له باك إند منفصل — مناسب لتحكم داخلي بسيط، مش بديل عن نظام مستخدمين حقيقي.
@@ -582,9 +626,17 @@ button:focus-visible, a:focus-visible, input:focus-visible, select:focus-visible
 <div class="overlay" id="closeShiftOverlay">
     <div class="sheet">
         <div class="sheet-handle"></div>
-        <div class="sheet-title" data-ar="تأكيد إقفال الشيفت" data-en="Confirm Close Shift">تأكيد إقفال الشيفت<button class="close-x" onclick="closeSheet('closeShiftOverlay')"><i class="fa-solid fa-xmark"></i></button></div>
+        <div class="sheet-title"><span data-ar="تأكيد إقفال الشيفت" data-en="Confirm Close Shift">تأكيد إقفال الشيفت</span><button class="close-x" onclick="closeSheet('closeShiftOverlay')"><i class="fa-solid fa-xmark"></i></button></div>
         <div class="panel" id="closeShiftSummary" style="margin-bottom:14px;"></div>
         <button class="btn btn-amber btn-block" onclick="confirmCloseShift()"><i class="fa-solid fa-lock"></i> <span data-ar="تأكيد الإقفال" data-en="Confirm Close">تأكيد الإقفال</span></button>
+    </div>
+</div>
+
+<div class="overlay" id="shiftDetailsOverlay">
+    <div class="sheet">
+        <div class="sheet-handle"></div>
+        <div class="sheet-title"><span data-ar="تفاصيل الشيفت" data-en="Shift Details">تفاصيل الشيفت</span><button class="close-x" onclick="closeSheet('shiftDetailsOverlay')"><i class="fa-solid fa-xmark"></i></button></div>
+        <div class="panel" id="shiftDetailsSummary" style="margin-bottom:14px;"></div>
     </div>
 </div>
 
@@ -673,12 +725,34 @@ function showScreen(id) {
     document.getElementById(id).classList.add('active');
 }
 function navigateTo(viewId) {
+    // امنع الموظف من فتح شاشات مش مسموح له بيها حتى لو حصل استدعاء مباشر للدالة
+    if (currentUser && currentUser.type !== 'owner') {
+        const perms = currentUser.permissions || {};
+        if (viewId === 'view-settings' && !perms.settings) viewId = 'view-dashboard';
+        if (viewId === 'view-shift' && !perms.shift) viewId = 'view-dashboard';
+        if (viewId === 'view-stations' && !perms.stations) viewId = 'view-dashboard';
+    }
     document.querySelectorAll('.view').forEach(v => v.classList.remove('active'));
     document.getElementById(viewId).classList.add('active');
     document.querySelectorAll('.nav-btn').forEach(b => b.classList.toggle('active', b.dataset.view === viewId));
     if (viewId === 'view-dashboard') renderDashboard();
     if (viewId === 'view-shift') renderShiftView();
     if (viewId === 'view-settings') { renderSettings(); renderSettingsStations(); renderSettingsPaymentMethods(); }
+}
+
+// ============================================================
+// صلاحيات الموظفين — يتحدد شكل الواجهة على أساسها
+// ============================================================
+function applyPermissions() {
+    const isOwner = currentUser.type === 'owner';
+    const perms = currentUser.permissions || {};
+    const navSettings = document.querySelector('.bottom-nav .nav-btn[data-view="view-settings"]');
+    const navShift = document.querySelector('.bottom-nav .nav-btn[data-view="view-shift"]');
+    const navStations = document.querySelector('.bottom-nav .nav-btn[data-view="view-stations"]');
+    if (navSettings) navSettings.style.display = (isOwner || perms.settings) ? 'flex' : 'none';
+    if (navShift) navShift.style.display = (isOwner || perms.shift) ? 'flex' : 'none';
+    if (navStations) navStations.style.display = (isOwner || perms.stations) ? 'flex' : 'none';
+    document.getElementById('fabAddExpense').style.display = (isOwner || perms.shift) ? 'flex' : 'none';
 }
 function openSheet(id) { document.getElementById(id).classList.add('show'); }
 function closeSheet(id) { document.getElementById(id).classList.remove('show'); if (id === 'stationOverlay') activeStationId = null; }
@@ -750,7 +824,50 @@ function proceedToLock() {
     if (deviceRecord.revoked || !deviceRecord.is_active) { subLine.textContent = t('الجهاز موقوف — تواصل مع الإدارة', 'Device suspended — contact admin'); }
     else if (expiry && expiry < new Date()) { subLine.textContent = t('الاشتراك منتهي — تواصل مع الإدارة', 'Subscription expired — contact admin'); }
     else if (expiry) { const days = Math.ceil((expiry - new Date()) / 86400000); subLine.textContent = t(`متبقي ${days} يوم على الاشتراك`, `${days} days remaining on subscription`); }
+    resetLockRole();
     showScreen('lockScreen');
+}
+
+// ============================================================
+// اختيار الدور في شاشة القفل: مالك/أدمن أو موظف
+// ============================================================
+function selectLockRole(role) {
+    document.getElementById('lockError').textContent = '';
+    document.getElementById('lockRoleChoice').style.display = 'none';
+    document.getElementById('lockOwnerForm').style.display = role === 'owner' ? 'block' : 'none';
+    document.getElementById('lockEmployeeForm').style.display = role === 'employee' ? 'block' : 'none';
+}
+
+function resetLockRole() {
+    document.getElementById('lockError').textContent = '';
+    document.getElementById('lockPinInput').value = '';
+    document.getElementById('lockEmpName').value = '';
+    document.getElementById('lockEmpPin').value = '';
+    document.getElementById('lockOwnerForm').style.display = 'none';
+    document.getElementById('lockEmployeeForm').style.display = 'none';
+    document.getElementById('lockRoleChoice').style.display = 'block';
+}
+
+async function handleEmployeeUnlock() {
+    const name = document.getElementById('lockEmpName').value.trim();
+    const pin = document.getElementById('lockEmpPin').value.trim();
+    const errEl = document.getElementById('lockError');
+    errEl.textContent = '';
+    if (deviceRecord.revoked || !deviceRecord.is_active) { errEl.textContent = t('الجهاز موقوف.', 'Device suspended.'); return; }
+    if (deviceRecord.expiry_date && new Date(deviceRecord.expiry_date) < new Date()) { errEl.textContent = t('الاشتراك منتهي.', 'Subscription expired.'); return; }
+    if (!name || !pin) { errEl.textContent = t('اكتب الاسم والـ PIN.', 'Enter your name and PIN.'); return; }
+
+    const { data: emps, error } = await supabaseClient.from('employees').select('*').eq('business_id', business.id).eq('active', true);
+    if (error) { errEl.textContent = t('حصل خطأ، حاول تاني.', 'Error, try again.'); console.error('Error loading employees for login:', error); return; }
+    const emp = (emps || []).find(e => e.name && e.name.trim().toLowerCase() === name.toLowerCase() && String(e.pin) === pin);
+    if (emp) {
+        currentUser = { type: 'employee', ...emp };
+        document.getElementById('lockEmpName').value = '';
+        document.getElementById('lockEmpPin').value = '';
+        enterMainApp();
+        return;
+    }
+    errEl.textContent = t('الاسم أو الـ PIN غير صحيح.', 'Incorrect name or PIN.');
 }
 
 async function handleUnlock() {
@@ -816,8 +933,11 @@ async function enterMainApp() {
     document.getElementById('headerBizName').textContent = business.name;
     document.getElementById('headerBizCode').textContent = business.code;
     showScreen('mainApp');
-    document.getElementById('fabAddExpense').style.display = (currentUser.type === 'owner' || currentUser.permissions.shift) ? 'flex' : 'none';
-    navigateTo('view-dashboard');
+    applyPermissions();
+    // نفعّل شاشة الرئيسية بصريًا بس من غير ما نعمل render قبل ما البيانات (وأهمها الشيفت الحالي) توصل فعلاً
+    document.querySelectorAll('.view').forEach(v => v.classList.remove('active'));
+    document.getElementById('view-dashboard').classList.add('active');
+    document.querySelectorAll('.nav-btn').forEach(b => b.classList.toggle('active', b.dataset.view === 'view-dashboard'));
     await loadAllData();
     subscribeRealtime();
     startTicker();
@@ -924,6 +1044,7 @@ function handleSessionChange(payload) {
     }
     renderStationsGrid();
     if (document.getElementById('view-dashboard').classList.contains('active')) renderDashboard();
+    if (document.getElementById('view-shift').classList.contains('active')) renderShiftView();
     if (activeStationId === row.station_id) openStationSheet(activeStationId);
 }
 
@@ -957,7 +1078,7 @@ function formatElapsed(start) {
 // DASHBOARD
 // ============================================================
 async function renderDashboard() {
-    const { data: todaySessions } = await supabaseClient.from('sessions').select('amount, payment_method').eq('business_id', business.id).eq('status', 'completed').gte('started_at', currentShift.opened_at);
+    const { data: todaySessions } = await supabaseClient.from('sessions').select('amount, payment_method').eq('business_id', business.id).eq('status', 'completed').gte('ended_at', currentShift.opened_at);
     const revenue = (todaySessions || []).reduce((sum, s) => sum + (Number(s.amount) || 0), 0);
     const { data: todayExpenses } = await supabaseClient.from('expenses').select('amount').eq('shift_id', currentShift.id);
     const expenses = (todayExpenses || []).reduce((sum, e) => sum + Number(e.amount), 0);
@@ -988,8 +1109,59 @@ function renderStationsGrid() {
 // ============================================================
 // STATION MANAGEMENT (Settings)
 // ============================================================
+let settingsStationsExpanded = false;
+function toggleSettingsStations() {
+    settingsStationsExpanded = !settingsStationsExpanded;
+    document.getElementById('settingsStations').style.display = settingsStationsExpanded ? 'block' : 'none';
+    document.getElementById('settingsStationsChevron').style.transform = settingsStationsExpanded ? 'rotate(180deg)' : 'rotate(0deg)';
+}
+
+async function applyBulkRate() {
+    const rateInput = document.getElementById('bulkRateInput');
+    const rate = parseFloat(rateInput.value);
+    if (isNaN(rate) || rate < 0) {
+        showToast(t('اكتب سعر صحيح', 'Enter a valid price'), 'error');
+        return;
+    }
+    if (!stations || stations.length === 0) {
+        showToast(t('مفيش أجهزة عشان تتحدث', 'No devices to update'), 'error');
+        return;
+    }
+    if (!confirm(t(`هل أنت متأكد من تثبيت سعر ${rate} ج/ساعة لكل الأجهزة (${stations.length})؟`, `Set ${rate} EGP/hr for all ${stations.length} devices?`))) return;
+
+    try {
+        const { data, error } = await supabaseClient
+            .from('stations')
+            .update({ rate })
+            .eq('business_id', business.id)
+            .select();
+
+        if (error) {
+            showToast(t('فشل تحديث السعر: ' + error.message, 'Failed to update price: ' + error.message), 'error');
+            console.error('Error bulk-updating rates:', error);
+            return;
+        }
+        if (!data || data.length === 0) {
+            console.error('Bulk rate update affected 0 rows — check RLS UPDATE policy on "stations" table.');
+            showToast(t('فشل تحديث السعر: قاعدة البيانات رفضت الحفظ (تحقق من صلاحيات RLS على جدول stations)', 'Failed to update price: database rejected the save (check RLS permissions on the stations table)'), 'error');
+            return;
+        }
+
+        rateInput.value = '';
+        showToast(t('اتحدث سعر كل الأجهزة', 'All device prices updated'), 'success');
+        await loadStations();
+        renderSettingsStations();
+        renderStationsGrid();
+    } catch (e) {
+        console.error('Error applying bulk rate:', e);
+        showToast(t('حصل خطأ، حاول تاني.', 'Error, try again.'), 'error');
+    }
+}
+
 function renderSettingsStations() {
     const el = document.getElementById('settingsStations');
+    const countEl = document.getElementById('settingsStationsCount');
+    if (countEl) countEl.textContent = stations && stations.length ? `(${stations.length})` : '';
     if (!stations || stations.length === 0) {
         el.innerHTML = `<div class="empty"><i class="fa-solid fa-gamepad"></i>${t('مفيش أجهزة — ضيف أول جهاز', 'No devices — add your first device')}</div>`;
         return;
@@ -1373,16 +1545,22 @@ async function confirmEndSessionWithPayment() {
     const amount = Math.round((timeCost + ordersCost) * 100) / 100;
 
     try {
-        const { error } = await supabaseClient.from('sessions').update({
+        const { data, error } = await supabaseClient.from('sessions').update({
             status: 'completed',
             ended_at: new Date().toISOString(),
             amount: amount,
             payment_method: selectedPaymentMethod
-        }).eq('id', session.id);
+        }).eq('id', session.id).select();
         
         if (error) {
             console.error('Error ending session:', error);
             showToast(t('فشل إنهاء الجلسة: ' + error.message, 'Failed to end session: ' + error.message), 'error');
+            return;
+        }
+        if (!data || data.length === 0) {
+            // القاعدة رفضت التحديث بصمت — الغالب سياسة RLS في Supabase مش سامحة بالـ UPDATE على جدول sessions
+            console.error('Session update affected 0 rows — check RLS UPDATE policy on "sessions" table.');
+            showToast(t('فشل إنهاء الجلسة: قاعدة البيانات رفضت الحفظ (تحقق من صلاحيات RLS على جدول sessions)', 'Failed to end session: database rejected the save (check RLS permissions on the sessions table)'), 'error');
             return;
         }
         
@@ -1392,6 +1570,7 @@ async function confirmEndSessionWithPayment() {
         const pm = paymentMethods.find(p => p.id === selectedPaymentMethod);
         showToast(`${t('اتقفلت الجلسة —', 'Session closed —')} ${money(amount)} ${t('ج', 'EGP')} (${pm ? pm.name : ''})`, 'success');
         renderDashboard();
+        if (document.getElementById('view-shift').classList.contains('active')) renderShiftView();
     } catch (e) {
         console.error('Error in confirmEndSessionWithPayment:', e);
         showToast(t('حصل خطأ، حاول تاني.', 'Error, try again.'), 'error');
@@ -1420,13 +1599,31 @@ async function getShiftTotals(shift) {
     try {
         const { data: sessRows } = await supabaseClient
             .from('sessions')
-            .select('amount, payment_method')
+            .select('id, amount, payment_method')
             .eq('business_id', business.id)
             .eq('status', 'completed')
-            .gte('started_at', shift.opened_at)
-            .lte('started_at', shift.closed_at || new Date().toISOString());
+            .gte('ended_at', shift.opened_at)
+            .lte('ended_at', shift.closed_at || new Date().toISOString());
         
         const revenue = (sessRows || []).reduce((s, r) => s + (Number(r.amount) || 0), 0);
+
+        // إيراد المنيو لكل صنف — بنجيبه من طلبات الجلسات اللي اتقفلت في الشيفت ده
+        const sessionIds = (sessRows || []).map(r => r.id);
+        let itemsRevenue = 0;
+        const itemBreakdown = {};
+        if (sessionIds.length > 0) {
+            const { data: orderRows } = await supabaseClient
+                .from('session_orders')
+                .select('item_name, quantity, unit_price, session_id')
+                .in('session_id', sessionIds);
+            (orderRows || []).forEach(o => {
+                const lineTotal = Number(o.quantity || 0) * Number(o.unit_price || 0);
+                itemsRevenue += lineTotal;
+                itemBreakdown[o.item_name] = (itemBreakdown[o.item_name] || 0) + lineTotal;
+            });
+        }
+        // إيراد الساعات فقط = إجمالي الإيراد - إيراد أصناف المنيو
+        const hoursRevenue = Math.max(0, revenue - itemsRevenue);
         
         const { data: expRows } = await supabaseClient
             .from('expenses')
@@ -1440,11 +1637,14 @@ async function getShiftTotals(shift) {
             expenses, 
             profit: revenue - expenses, 
             expenseRows: expRows || [], 
-            sessions: sessRows || [] 
+            sessions: sessRows || [],
+            hoursRevenue,
+            itemsRevenue,
+            itemBreakdown
         };
     } catch (e) {
         console.error('Error getting shift totals:', e);
-        return { revenue: 0, expenses: 0, profit: 0, expenseRows: [], sessions: [] };
+        return { revenue: 0, expenses: 0, profit: 0, expenseRows: [], sessions: [], hoursRevenue: 0, itemsRevenue: 0, itemBreakdown: {} };
     }
 }
 
@@ -1518,7 +1718,7 @@ async function renderShiftView() {
         const netLabel = t('صافي الدخل', 'Net Income');
         
         historyHtml += `
-            <div class="list-row" style="flex-direction:column;align-items:stretch;padding:12px 4px;border-bottom:1px solid var(--border);">
+            <div class="list-row" style="flex-direction:column;align-items:stretch;padding:12px 4px;border-bottom:1px solid var(--border);cursor:pointer;" onclick="viewShiftDetails('${shift.id}')">
                 <div style="display:flex;justify-content:space-between;width:100%;margin-bottom:6px;">
                     <div class="row-title">${dateStr} - ${timeStr}</div>
                     <div style="display:flex;gap:8px;align-items:center;">
@@ -1526,7 +1726,7 @@ async function renderShiftView() {
                             <span>${revLabel} <span class="mono" style="color:var(--text);">${money(shiftTotals.revenue)}</span></span>
                             <span>${expLabel} <span class="mono" style="color:var(--text);">${money(shiftTotals.expenses)}</span></span>
                         </div>
-                        <button class="btn btn-danger-sm" onclick="deleteShift('${shift.id}')" title="${t('حذف الشيفت', 'Delete shift')}" style="padding:4px 8px;font-size:11px;">
+                        <button class="btn btn-danger-sm" onclick="event.stopPropagation(); deleteShift('${shift.id}')" title="${t('حذف الشيفت', 'Delete shift')}" style="padding:4px 8px;font-size:11px;">
                             <i class="fa-solid fa-xmark"></i>
                         </button>
                     </div>
@@ -1545,18 +1745,29 @@ async function renderShiftView() {
 // حذف الشيفت
 // ============================================================
 async function deleteShift(shiftId) {
-    if (!confirm(t('هل أنت متأكد من حذف هذا الشيفت؟ سيتم حذف كل الجلسات والمصروفات المرتبطة به.', 'Are you sure you want to delete this shift? All sessions and expenses associated with it will be deleted.'))) return;
+    if (!confirm(t('هل أنت متأكد من حذف هذا الشيفت؟ سيتم حذف كل الجلسات والمصروفات المرتبطة به فقط.', 'Are you sure you want to delete this shift? Only the sessions and expenses that belong to it will be deleted.'))) return;
     
     try {
-        // حذف المصروفات المرتبطة
+        // لازم نجيب الشيفت نفسه الأول عشان نعرف نطاقه الزمني بالظبط
+        const { data: shift, error: shiftErr } = await supabaseClient.from('shifts').select('*').eq('id', shiftId).single();
+        if (shiftErr || !shift) {
+            showToast(t('تعذر إيجاد الشيفت', 'Could not find the shift'), 'error');
+            console.error('Error loading shift to delete:', shiftErr);
+            return;
+        }
+        const rangeEnd = shift.closed_at || new Date().toISOString();
+
+        // حذف المصروفات المرتبطة بالشيفت ده بس (عندها shift_id فعلي)
         await supabaseClient.from('expenses').delete().eq('shift_id', shiftId);
         
-        // حذف الجلسات المرتبطة بالشيفت (جيب الجلسات الأول)
+        // حذف الجلسات اللي اتقفلت (ended_at) جوه نطاق الشيفت ده بالظبط — مش كل الجلسات في التطبيق
         const { data: sessionsToDelete } = await supabaseClient
             .from('sessions')
             .select('id')
             .eq('business_id', business.id)
-            .eq('status', 'completed');
+            .eq('status', 'completed')
+            .gte('ended_at', shift.opened_at)
+            .lte('ended_at', rangeEnd);
         
         if (sessionsToDelete && sessionsToDelete.length > 0) {
             const sessionIds = sessionsToDelete.map(s => s.id);
@@ -1578,21 +1789,62 @@ async function deleteShift(shiftId) {
     }
 }
 
-async function openCloseShiftSheet() {
-    const totals = await getShiftTotals(currentShift);
-    document.getElementById('closeShiftSummary').innerHTML = `
-        <div class="list-row"><div class="row-title">${t('الإيراد', 'Revenue')}</div><div class="row-value mono">${money(totals.revenue)}</div></div>
+function buildShiftBreakdownHtml(totals, extraRowsHtml) {
+    const itemEntries = Object.entries(totals.itemBreakdown);
+    const itemsHtml = itemEntries.length
+        ? itemEntries.map(([name, amt]) =>
+            `<div class="list-row"><div class="row-title">${escapeHtml(name)}</div><div class="row-value mono">${money(amt)}</div></div>`
+          ).join('')
+        : `<div class="empty" style="padding:10px 0;">${t('لا يوجد طلبات منيو في هذا الشيفت', 'No menu orders this shift')}</div>`;
+
+    const expensesHtml = totals.expenseRows.length
+        ? totals.expenseRows.map(e =>
+            `<div class="list-row"><div class="row-title">${escapeHtml(e.description)}</div><div class="row-value mono">${money(e.amount)}</div></div>`
+          ).join('')
+        : `<div class="empty" style="padding:10px 0;">${t('لا يوجد مصروفات في هذا الشيفت', 'No expenses this shift')}</div>`;
+
+    return `
+        <div class="list-row"><div class="row-title">${t('إيراد الساعات', 'Hours Revenue')}</div><div class="row-value mono">${money(totals.hoursRevenue)}</div></div>
+        <div class="list-row"><div class="row-title">${t('إيراد المنيو', 'Menu Revenue')}</div><div class="row-value mono">${money(totals.itemsRevenue)}</div></div>
+        <div class="list-row"><div class="row-title">${t('إجمالي الإيراد', 'Total Revenue')}</div><div class="row-value mono">${money(totals.revenue)}</div></div>
         <div class="list-row"><div class="row-title">${t('المصروفات', 'Expenses')}</div><div class="row-value mono">${money(totals.expenses)}</div></div>
         <div class="list-row"><div class="row-title">${t('الصافي', 'Net Income')}</div><div class="row-value mono">${money(totals.profit)}</div></div>
-        <div class="list-row"><div class="row-title">${t('أجهزة لسه شغالة', 'Active Devices')}</div><div class="row-value mono">${Object.keys(sessions).length}</div></div>`;
+        ${extraRowsHtml || ''}
+        <div class="section-title" style="margin:14px 0 6px;">${t('إيراد المنيو حسب الصنف', 'Menu Revenue by Item')}</div>
+        ${itemsHtml}
+        <div class="section-title" style="margin:14px 0 6px;">${t('المصروفات المسجلة في الشيفت', 'Expenses Recorded This Shift')}</div>
+        ${expensesHtml}`;
+}
+
+async function openCloseShiftSheet() {
+    const totals = await getShiftTotals(currentShift);
+    const extraRow = `<div class="list-row"><div class="row-title">${t('أجهزة لسه شغالة', 'Active Devices')}</div><div class="row-value mono">${Object.keys(sessions).length}</div></div>`;
+    document.getElementById('closeShiftSummary').innerHTML = buildShiftBreakdownHtml(totals, extraRow);
     openSheet('closeShiftOverlay');
+}
+
+async function viewShiftDetails(shiftId) {
+    const { data: shift, error } = await supabaseClient.from('shifts').select('*').eq('id', shiftId).single();
+    if (error || !shift) {
+        showToast(t('تعذر تحميل تفاصيل الشيفت', 'Could not load shift details'), 'error');
+        console.error('Error loading shift details:', error);
+        return;
+    }
+    const totals = await getShiftTotals(shift);
+    const openedStr = new Date(shift.opened_at).toLocaleString(currentLang === 'ar' ? 'ar-EG' : 'en-US');
+    const closedStr = shift.closed_at ? new Date(shift.closed_at).toLocaleString(currentLang === 'ar' ? 'ar-EG' : 'en-US') : '—';
+    const extraRows = `
+        <div class="list-row"><div class="row-title">${t('وقت الفتح', 'Opened At')}</div><div class="row-value mono">${openedStr}</div></div>
+        <div class="list-row"><div class="row-title">${t('وقت الإقفال', 'Closed At')}</div><div class="row-value mono">${closedStr}</div></div>`;
+    document.getElementById('shiftDetailsSummary').innerHTML = buildShiftBreakdownHtml(totals, extraRows);
+    openSheet('shiftDetailsOverlay');
 }
 
 async function confirmCloseShift() {
     const totals = await getShiftTotals(currentShift);
     const closedAt = new Date().toISOString();
     
-    const { error } = await supabaseClient
+    const { data, error } = await supabaseClient
         .from('shifts')
         .update({ 
             status: 'closed', 
@@ -1602,11 +1854,18 @@ async function confirmCloseShift() {
             total_profit: totals.profit, 
             closed_by: currentUser.name || currentUser.type 
         })
-        .eq('id', currentShift.id);
+        .eq('id', currentShift.id)
+        .select();
     
     if (error) {
-        showToast(t('فشل إقفال الشيفت', 'Failed to close shift'), 'error');
+        showToast(t('فشل إقفال الشيفت: ' + error.message, 'Failed to close shift: ' + error.message), 'error');
         console.error('Error closing shift:', error);
+        return;
+    }
+    if (!data || data.length === 0) {
+        // القاعدة رفضت التحديث بصمت — الغالب سياسة RLS في Supabase مش سامحة بالـ UPDATE على جدول shifts
+        console.error('Shift update affected 0 rows — check RLS UPDATE policy on "shifts" table.');
+        showToast(t('فشل إقفال الشيفت: قاعدة البيانات رفضت الحفظ (تحقق من صلاحيات RLS على جدول shifts)', 'Failed to close shift: database rejected the save (check RLS permissions on the shifts table)'), 'error');
         return;
     }
     
@@ -1635,7 +1894,16 @@ function renderSettings() {
 
     document.getElementById('settingsEmployees').innerHTML = employees.length === 0
         ? `<div class="empty"><i class="fa-solid fa-user-group"></i>${t('لسه مفيش موظفين', 'No employees yet')}</div>`
-        : employees.map(e => `<div class="list-row"><div class="row-title">${escapeHtml(e.name)}</div><div class="badge ${e.active ? 'badge-teal' : 'badge-red'}">${e.active ? t('نشط', 'Active') : t('موقوف', 'Inactive')}</div></div>`).join('');
+        : employees.map(e => `
+            <div class="list-row">
+                <div class="row-title">${escapeHtml(e.name)}</div>
+                <div class="row-actions">
+                    <div class="badge ${e.active ? 'badge-teal' : 'badge-red'}">${e.active ? t('نشط', 'Active') : t('موقوف', 'Inactive')}</div>
+                    <button class="btn btn-danger-sm" onclick="deleteEmployee('${e.id}')" title="${t('حذف الموظف', 'Delete employee')}">
+                        <i class="fa-solid fa-trash"></i>
+                    </button>
+                </div>
+            </div>`).join('');
 }
 
 function openMenuItemSheet() { document.getElementById('menuItemName').value = ''; document.getElementById('menuItemPrice').value = ''; document.getElementById('menuItemError').textContent = ''; openSheet('menuItemOverlay'); }
@@ -1649,18 +1917,45 @@ async function submitMenuItem() {
     await loadMenuItems(); renderSettings();
 }
 
-function openEmployeeSheet() { document.getElementById('employeeName').value = ''; document.getElementById('employeePin').value = ''; document.getElementById('employeeError').textContent = ''; openSheet('employeeOverlay'); }
+function openEmployeeSheet() {
+    document.getElementById('employeeName').value = '';
+    document.getElementById('employeePin').value = '';
+    document.getElementById('employeeError').textContent = '';
+    document.getElementById('permStations').checked = true;
+    document.getElementById('permShift').checked = false;
+    document.getElementById('permSettings').checked = false;
+    openSheet('employeeOverlay');
+}
 async function submitEmployee() {
     const name = document.getElementById('employeeName').value.trim();
     const pin = document.getElementById('employeePin').value.trim();
     if (!name || !/^\d{4,6}$/.test(pin)) { document.getElementById('employeeError').textContent = t('اكتب اسم و PIN من 4 لـ 6 أرقام.', 'Enter name and 4-6 digit PIN.'); return; }
     const permissions = {
         stations: document.getElementById('permStations').checked,
-        shift: document.getElementById('permShift').checked
+        shift: document.getElementById('permShift').checked,
+        settings: document.getElementById('permSettings').checked
     };
-    await supabaseClient.from('employees').insert({ business_id: business.id, name, pin, permissions });
+    const { data, error } = await supabaseClient.from('employees').insert({ business_id: business.id, name, pin, permissions }).select();
+    if (error || !data || data.length === 0) {
+        document.getElementById('employeeError').textContent = t('فشل حفظ الموظف، حاول تاني.', 'Failed to save employee, try again.');
+        console.error('Error adding employee:', error);
+        return;
+    }
     closeSheet('employeeOverlay'); showToast(t('تمت إضافة الموظف', 'Employee added'), 'success');
     await loadEmployees(); renderSettings();
+}
+
+async function deleteEmployee(employeeId) {
+    if (!confirm(t('هل أنت متأكد من حذف هذا الموظف؟', 'Are you sure you want to delete this employee?'))) return;
+    try {
+        await supabaseClient.from('employees').delete().eq('id', employeeId);
+        showToast(t('تم حذف الموظف', 'Employee deleted'), 'success');
+        await loadEmployees();
+        renderSettings();
+    } catch (e) {
+        console.error('Error deleting employee:', e);
+        showToast(t('فشل حذف الموظف', 'Failed to delete employee'), 'error');
+    }
 }
 
 function escapeHtml(str) { const d = document.createElement('div'); d.textContent = str ?? ''; return d.innerHTML; }
