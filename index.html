@@ -300,10 +300,6 @@ button:focus-visible, a:focus-visible, input:focus-visible, select:focus-visible
                 <label data-ar="كود النشاط التجاري" data-en="Business Code">كود النشاط التجاري</label>
                 <input type="text" id="setupBusinessCode" class="mono" placeholder="مثال: CAFE01" style="text-transform:uppercase">
             </div>
-            <div class="field">
-                <label data-ar="اسم هذا الجهاز" data-en="Device Name">اسم هذا الجهاز</label>
-                <input type="text" id="setupDeviceLabel" placeholder="مثال: تابلت الكاونتر">
-            </div>
             <button class="btn btn-amber btn-block" id="setupContinueBtn" onclick="handleSetupContinue()">
                 <i class="fa-solid fa-arrow-left"></i> <span data-ar="متابعة" data-en="Continue">متابعة</span>
             </button>
@@ -449,9 +445,9 @@ button:focus-visible, a:focus-visible, input:focus-visible, select:focus-visible
             <i class="fa-solid fa-chevron-down" id="settingsStationsChevron" style="transition:transform .2s;"></i>
         </div>
         <div class="panel" id="settingsStations" style="display:none;"></div>
-        <div class="panel" style="margin-top:8px;display:flex;gap:8px;align-items:center;">
-            <input type="number" id="bulkRateInput" class="mono" placeholder="السعر بالجنيه/ساعة" style="flex:1;background:var(--bg);border:1px solid var(--border);color:var(--text);border-radius:8px;padding:10px;">
-            <button class="btn btn-amber" onclick="applyBulkRate()" style="white-space:nowrap;"><i class="fa-solid fa-check-double"></i> <span data-ar="تثبيت لكل الأجهزة" data-en="Apply to All">تثبيت لكل الأجهزة</span></button>
+        <div class="panel" style="margin-top:8px;">
+            <input type="number" id="bulkRateInput" class="mono" placeholder="السعر بالجنيه/ساعة" style="width:100%;box-sizing:border-box;background:var(--bg);border:1px solid var(--border);color:var(--text);border-radius:8px;padding:10px;margin-bottom:8px;">
+            <button class="btn btn-amber btn-block" onclick="applyBulkRate()"><i class="fa-solid fa-check-double"></i> <span data-ar="تثبيت لكل الأجهزة" data-en="Apply to All">تثبيت لكل الأجهزة</span></button>
         </div>
         <button class="btn btn-ghost btn-block" style="margin-top:8px;" onclick="openStationManagementSheet()"><i class="fa-solid fa-plus"></i> <span data-ar="إضافة جهاز" data-en="Add Device">إضافة جهاز</span></button>
 
@@ -763,7 +759,6 @@ function t(ar, en) { return currentLang === 'ar' ? ar : en; }
 // ============================================================
 async function handleSetupContinue() {
     const code = document.getElementById('setupBusinessCode').value.trim().toUpperCase();
-    const label = document.getElementById('setupDeviceLabel').value.trim();
     const errEl = document.getElementById('setupError');
     errEl.textContent = '';
     if (!code) { errEl.textContent = t('اكتب كود النشاط.', 'Enter the business code.'); return; }
@@ -779,7 +774,6 @@ async function handleSetupContinue() {
         const { data: dev } = await supabaseClient.from('devices').select('*').eq('business_id', biz.id).eq('device_id', deviceId).maybeSingle();
         if (!dev) {
             document.getElementById('activationBizName').textContent = biz.name;
-            if (label) localStorage.setItem('psr_device_label', label);
             showScreen('activationScreen');
             return;
         }
@@ -804,7 +798,7 @@ async function handleActivateDevice() {
         const expiry = new Date(); expiry.setDate(expiry.getDate() + 30);
         const { data: newDev, error: devErr } = await supabaseClient.from('devices').insert({
             business_id: business.id, device_id: deviceId,
-            device_label: localStorage.getItem('psr_device_label') || t('جهاز بدون اسم', 'Unnamed device'),
+            device_label: t('جهاز بدون اسم', 'Unnamed device'),
             is_active: true, revoked: false, expiry_date: expiry.toISOString()
         }).select().single();
         if (devErr) { errEl.textContent = t('فشل التفعيل، حاول تاني.', 'Activation failed, try again.'); return; }
@@ -904,10 +898,8 @@ function lockApp() {
 function switchBusiness() {
     stopRealtimeAndTimers();
     localStorage.removeItem('psr_business_code');
-    localStorage.removeItem('psr_device_label');
     business = null; deviceRecord = null; currentUser = null;
     document.getElementById('setupBusinessCode').value = '';
-    document.getElementById('setupDeviceLabel').value = '';
     showScreen('setupScreen');
 }
 
