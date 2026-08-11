@@ -410,6 +410,46 @@ button:focus-visible, a:focus-visible, input:focus-visible, select:focus-visible
     border-color: var(--red-dim);
     background: var(--bg-sunken);
 }
+
+/* ---------- menu category grouping ---------- */
+.menu-category-group {
+    margin-bottom: 8px;
+}
+.menu-category-toggle {
+    display: flex;
+    align-items: center;
+    justify-content: space-between;
+    padding: 8px 12px;
+    background: var(--bg-sunken);
+    border-radius: var(--radius-sm);
+    cursor: pointer;
+    border: 1px solid var(--border);
+    transition: border-color 0.2s;
+}
+.menu-category-toggle:hover {
+    border-color: var(--border-strong);
+}
+.menu-category-toggle .cat-title {
+    font-weight: 700;
+    font-size: 13px;
+    color: var(--teal);
+}
+.menu-category-toggle .cat-arrow {
+    transition: transform 0.25s var(--ease);
+    color: var(--text-dim);
+}
+.menu-category-toggle .cat-arrow.open {
+    transform: rotate(180deg);
+}
+.menu-category-items {
+    display: none;
+    padding: 6px 8px;
+    flex-wrap: wrap;
+    gap: 6px;
+}
+.menu-category-items.open {
+    display: flex;
+}
 </style>
 </head>
 <body>
@@ -623,33 +663,26 @@ button:focus-visible, a:focus-visible, input:focus-visible, select:focus-visible
         <button class="btn btn-ghost btn-block" onclick="switchBusiness()"><i class="fa-solid fa-right-left"></i> <span data-ar="تبديل النشاط" data-en="Switch Business">تبديل النشاط</span></button>
     </div>
 
-    <div class="fab" id="fabAddExpense" onclick="openExpenseSheet()"><i class="fa-solid fa-plus"></i></div>
+    <!-- ============== FAB ============== -->
+    <button class="fab" id="fabAddExpense" onclick="openExpenseSheet()" title="إضافة مصروف"><i class="fa-solid fa-wallet"></i></button>
 
-    <div class="bottom-nav">
-        <button class="nav-btn active" data-view="view-dashboard" onclick="navigateTo('view-dashboard')"><i class="fa-solid fa-gauge-high"></i><span data-ar="الرئيسية" data-en="Home">الرئيسية</span></button>
-        <button class="nav-btn" data-view="view-stations" onclick="navigateTo('view-stations')"><i class="fa-solid fa-gamepad"></i><span data-ar="الأجهزة" data-en="Devices">الأجهزة</span></button>
-        <button class="nav-btn" data-view="view-shift" onclick="navigateTo('view-shift')"><i class="fa-solid fa-cash-register"></i><span data-ar="الشيفت" data-en="Shift">الشيفت</span></button>
-        <button class="nav-btn" data-view="view-settings" onclick="navigateTo('view-settings')"><i class="fa-solid fa-gear"></i><span data-ar="الإعدادات" data-en="Settings">الإعدادات</span></button>
+    <!-- ============== STATION SHEET ============== -->
+    <div class="overlay" id="stationOverlay">
+        <div class="sheet">
+            <div class="sheet-handle"></div>
+            <div class="sheet-title"><span id="stationSheetTitle">جهاز</span><button class="close-x" onclick="closeSheet('stationOverlay')"><i class="fa-solid fa-xmark"></i></button></div>
+            <div id="stationSheetBody"></div>
+        </div>
     </div>
-</div>
 
-<!-- ============== STATION SHEET ============== -->
-<div class="overlay" id="stationOverlay">
-    <div class="sheet">
-        <div class="sheet-handle"></div>
-        <div class="sheet-title"><span id="stationSheetTitle">جهاز</span><button class="close-x" onclick="closeSheet('stationOverlay')"><i class="fa-solid fa-xmark"></i></button></div>
-        <div id="stationSheetBody"></div>
+    <!-- ============== TRANSFER SHEET ============== -->
+    <div class="overlay" id="transferOverlay">
+        <div class="sheet">
+            <div class="sheet-handle"></div>
+            <div class="sheet-title"><span data-ar="نقل الجلسة إلى جهاز آخر" data-en="Transfer Session to Another Device">نقل الجلسة إلى جهاز آخر</span><button class="close-x" onclick="closeSheet('transferOverlay')"><i class="fa-solid fa-xmark"></i></button></div>
+            <div id="transferSheetBody"></div>
+        </div>
     </div>
-</div>
-
-<!-- ============== TRANSFER SHEET ============== -->
-<div class="overlay" id="transferOverlay">
-    <div class="sheet">
-        <div class="sheet-handle"></div>
-        <div class="sheet-title"><span data-ar="نقل الجلسة إلى جهاز آخر" data-en="Transfer Session to Another Device">نقل الجلسة إلى جهاز آخر</span><button class="close-x" onclick="closeSheet('transferOverlay')"><i class="fa-solid fa-xmark"></i></button></div>
-        <div id="transferSheetBody"></div>
-    </div>
-</div>
 
 <!-- ============== STATION MANAGEMENT SHEET ============== -->
 <div class="overlay" id="stationManagementOverlay">
@@ -752,13 +785,27 @@ button:focus-visible, a:focus-visible, input:focus-visible, select:focus-visible
 <div class="overlay" id="menuItemOverlay">
     <div class="sheet">
         <div class="sheet-handle"></div>
-        <div class="sheet-title"><span data-ar="إضافة صنف للقائمة" data-en="Add Menu Item">إضافة صنف للقائمة</span><button class="close-x" onclick="closeSheet('menuItemOverlay')"><i class="fa-solid fa-xmark"></i></button></div>
-        <div class="field"><label data-ar="اسم الصنف" data-en="Item Name">اسم الصنف</label><input type="text" id="menuItemName"></div>
-        <div class="field"><label data-ar="السعر" data-en="Price">السعر</label><input type="number" id="menuItemPrice" class="mono"></div>
-        <div class="field"><label data-ar="النوع" data-en="Category">النوع</label>
-            <select id="menuItemCategory"><option value="food" data-ar="أكل" data-en="Food">أكل</option><option value="drink" data-ar="مشروب" data-en="Drink">مشروب</option><option value="other" data-ar="أخرى" data-en="Other">أخرى</option></select>
+        <div class="sheet-title"><span id="menuItemSheetTitle" data-ar="إضافة صنف للقائمة" data-en="Add Menu Item">إضافة صنف للقائمة</span><button class="close-x" onclick="closeSheet('menuItemOverlay')"><i class="fa-solid fa-xmark"></i></button></div>
+        <input type="hidden" id="menuItemId">
+        <div class="field">
+            <label data-ar="اسم الصنف" data-en="Item Name">اسم الصنف</label>
+            <input type="text" id="menuItemName">
+        </div>
+        <div class="field">
+            <label data-ar="السعر" data-en="Price">السعر</label>
+            <input type="number" id="menuItemPrice" class="mono">
+        </div>
+        <div class="field">
+            <label data-ar="التصنيف" data-en="Category">التصنيف</label>
+            <select id="menuItemCategory">
+                <option value="مشروبات باردة">🧊 مشروبات باردة</option>
+                <option value="مشروبات ساخنة">☕ مشروبات ساخنة</option>
+                <option value="أكل">🍔 أكل</option>
+                <option value="أخرى">📦 أخرى</option>
+            </select>
         </div>
         <button class="btn btn-amber btn-block" onclick="submitMenuItem()"><span data-ar="حفظ" data-en="Save">حفظ</span></button>
+        <button class="btn btn-red btn-block" style="margin-top:8px;display:none;" id="menuDeleteBtn" onclick="deleteMenuItem()"><i class="fa-solid fa-trash"></i> <span data-ar="حذف الصنف" data-en="Delete Item">حذف الصنف</span></button>
         <div class="error-text" id="menuItemError"></div>
     </div>
 </div>
@@ -915,6 +962,8 @@ let pendingSwitch = false;
 let transferSourceStationId = null;
 let countdownTimers = {};
 let countdownAlerts = {};
+// تخزين حالة التوجل لكل تصنيف
+let categoryToggleState = {};
 
 // ============================================================
 // UTILITIES
@@ -968,10 +1017,11 @@ function applyPermissions() {
     const navSettings = document.querySelector('.bottom-nav .nav-btn[data-view="view-settings"]');
     const navShift = document.querySelector('.bottom-nav .nav-btn[data-view="view-shift"]');
     const navStations = document.querySelector('.bottom-nav .nav-btn[data-view="view-stations"]');
+    const fab = document.getElementById('fabAddExpense');
     if (navSettings) navSettings.style.display = (isOwner || perms.settings) ? 'flex' : 'none';
     if (navShift) navShift.style.display = (isOwner || perms.shift) ? 'flex' : 'none';
     if (navStations) navStations.style.display = (isOwner || perms.stations) ? 'flex' : 'none';
-    document.getElementById('fabAddExpense').style.display = (isOwner || perms.shift) ? 'flex' : 'none';
+    if (fab) fab.style.display = (isOwner || perms.shift) ? 'flex' : 'none';
 }
 
 // ============================================================
@@ -1175,9 +1225,96 @@ async function loadStations() {
     (activeSessions || []).forEach(s => { sessions[s.station_id] = s; });
 }
 
+// ============================================================
+// MENU ITEMS - with localStorage fallback
+// ============================================================
 async function loadMenuItems() {
-    const { data } = await supabaseClient.from('menu_items').select('*').eq('business_id', business.id).eq('active', true).order('created_at');
-    menuItems = data || [];
+    try {
+        const { data, error } = await supabaseClient.from('menu_items').select('*').eq('business_id', business.id).eq('active', true).order('created_at');
+        if (error) {
+            console.warn('Error loading menu items from DB:', error);
+            const localData = localStorage.getItem('psr_menu_items_' + business.id);
+            if (localData) {
+                menuItems = JSON.parse(localData);
+                return;
+            }
+            menuItems = [];
+            return;
+        }
+        if (data) {
+            menuItems = data;
+            localStorage.setItem('psr_menu_items_' + business.id, JSON.stringify(data));
+        }
+    } catch (e) {
+        console.warn('Error loading menu items:', e);
+        const localData = localStorage.getItem('psr_menu_items_' + business.id);
+        if (localData) {
+            menuItems = JSON.parse(localData);
+        } else {
+            menuItems = [];
+        }
+    }
+}
+
+async function saveMenuItemToDB(item) {
+    try {
+        const { data, error } = await supabaseClient.from('menu_items').insert(item).select().single();
+        if (error) {
+            console.error('Error saving menu item to DB:', error);
+            const localItems = JSON.parse(localStorage.getItem('psr_menu_items_' + business.id) || '[]');
+            const newItem = { ...item, id: 'local_' + Date.now(), created_at: new Date().toISOString() };
+            localItems.push(newItem);
+            localStorage.setItem('psr_menu_items_' + business.id, JSON.stringify(localItems));
+            return newItem;
+        }
+        return data;
+    } catch (e) {
+        console.error('Error in saveMenuItemToDB:', e);
+        const localItems = JSON.parse(localStorage.getItem('psr_menu_items_' + business.id) || '[]');
+        const newItem = { ...item, id: 'local_' + Date.now(), created_at: new Date().toISOString() };
+        localItems.push(newItem);
+        localStorage.setItem('psr_menu_items_' + business.id, JSON.stringify(localItems));
+        return newItem;
+    }
+}
+
+async function updateMenuItemInDB(id, updates) {
+    try {
+        const { data, error } = await supabaseClient.from('menu_items').update(updates).eq('id', id).select().single();
+        if (error) {
+            console.error('Error updating menu item in DB:', error);
+            const localItems = JSON.parse(localStorage.getItem('psr_menu_items_' + business.id) || '[]');
+            const index = localItems.findIndex(item => item.id === id);
+            if (index !== -1) {
+                localItems[index] = { ...localItems[index], ...updates };
+                localStorage.setItem('psr_menu_items_' + business.id, JSON.stringify(localItems));
+            }
+            return localItems.find(item => item.id === id) || null;
+        }
+        return data;
+    } catch (e) {
+        console.error('Error in updateMenuItemInDB:', e);
+        return null;
+    }
+}
+
+async function deleteMenuItemFromDB(id) {
+    try {
+        const { error } = await supabaseClient.from('menu_items').delete().eq('id', id);
+        if (error) {
+            console.error('Error deleting menu item from DB:', error);
+        }
+        let localItems = JSON.parse(localStorage.getItem('psr_menu_items_' + business.id) || '[]');
+        localItems = localItems.filter(item => item.id !== id);
+        localStorage.setItem('psr_menu_items_' + business.id, JSON.stringify(localItems));
+        return true;
+    } catch (e) {
+        console.error('Error in deleteMenuItemFromDB:', e);
+        let localItems = JSON.parse(localStorage.getItem('psr_menu_items_' + business.id) || '[]');
+        localItems = localItems.filter(item => item.id !== id);
+        localStorage.setItem('psr_menu_items_' + business.id, JSON.stringify(localItems));
+        return true;
+    }
 }
 
 async function loadEmployees() {
@@ -1250,6 +1387,19 @@ async function getSessionSegments(sessionId) {
 }
 
 async function createSegment(sessionId, mode, startedAt, rate, timerType, durationSeconds) {
+    const { data: existingList } = await supabaseClient
+        .from('session_segments')
+        .select('*')
+        .eq('session_id', sessionId)
+        .is('ended_at', null)
+        .order('started_at', { ascending: false })
+        .limit(1);
+    const existing = (existingList && existingList[0]) || null;
+    if (existing) {
+        activeSegmentCache[sessionId] = existing;
+        return existing;
+    }
+
     const { data, error } = await supabaseClient.from('session_segments').insert({
         session_id: sessionId,
         business_id: business.id,
@@ -1257,7 +1407,7 @@ async function createSegment(sessionId, mode, startedAt, rate, timerType, durati
         started_at: startedAt,
         rate: rate,
         timer_type: timerType || 'countup',
-        duration_seconds: durationSeconds || 0
+        duration_seconds: Math.round(durationSeconds) || 0
     }).select().single();
     if (error) throw error;
     sessionSegmentsCache[sessionId] = null;
@@ -1285,23 +1435,21 @@ async function getActiveSegment(sessionId) {
             .select('*')
             .eq('session_id', sessionId)
             .is('ended_at', null)
-            .maybeSingle();
-        activeSegmentCache[sessionId] = data || null;
-        return data;
+            .order('started_at', { ascending: false })
+            .limit(1);
+        const seg = (data && data[0]) || null;
+        activeSegmentCache[sessionId] = seg;
+        return seg;
     } catch (e) {
         console.warn('Error getting active segment:', e);
         return activeSegmentCache[sessionId] || null;
     }
 }
 
-// نسخة خفيفة: بتقرا من الكاش المحلي على طول من غير أي طلب شبكة.
-// مستخدمة في التيكر اللي بيشتغل كل ثانية عشان محدش يضرب قاعدة البيانات كل ثانية.
 function getActiveSegmentFast(sessionId) {
     return activeSegmentCache[sessionId] || null;
 }
 
-// تحميل كل الـ segments النشطة (المفتوحة) لكل الجلسات دفعة واحدة بطلب شبكة واحد بس،
-// بدل ما نعمل طلب منفصل لكل جلسة.
 async function preloadActiveSegments(sessionIds) {
     if (!sessionIds || sessionIds.length === 0) return;
     try {
@@ -1329,10 +1477,10 @@ async function calculateTotalAmounts(sessionId) {
     
     for (const seg of segments) {
         if (seg.ended_at) {
-            const start = new Date(seg.started_at);
-            const end = new Date(seg.ended_at);
-            const hours = (end - start) / 3600000;
-            const amount = Math.round((hours * Number(seg.rate)) * 100) / 100;
+            const hours = (new Date(seg.ended_at) - new Date(seg.started_at)) / 3600000;
+            const amount = (seg.amount !== null && seg.amount !== undefined)
+                ? Number(seg.amount)
+                : Math.round((hours * Number(seg.rate)) * 100) / 100;
             if (seg.mode === 'single') {
                 singleTotal += amount;
                 singleDuration += hours;
@@ -1378,7 +1526,6 @@ async function getCurrentSegmentEstimate(sessionId) {
     return { amount, hours, segment: activeSeg };
 }
 
-// نسخة خفيفة من getCurrentSegmentEstimate بتستخدم الكاش المحلي فقط (من غير طلب شبكة) — للتيكر بس
 function getCurrentSegmentEstimateFast(sessionId) {
     const activeSeg = getActiveSegmentFast(sessionId);
     if (!activeSeg) return { amount: 0, hours: 0, segment: null };
@@ -1474,7 +1621,6 @@ function handleSegmentChange(payload) {
     if (payload.new && payload.new.session_id) {
         const row = payload.new;
         sessionSegmentsCache[row.session_id] = null;
-        // حدث الكاش الخفيف على طول من نفس البيانات اللي جاية من الـ realtime، من غير أي طلب شبكة إضافي
         activeSegmentCache[row.session_id] = row.ended_at ? null : row;
         if (activeStationId && !pendingSwitch) {
             const session = sessions[activeStationId];
@@ -1486,10 +1632,7 @@ function handleSegmentChange(payload) {
 }
 
 // ============================================================
-// التيكر - بيشتغل كل ثانية وبيقرا من الكاش المحلي بس (activeSegmentCache)
-// من غير أي طلب شبكة لقاعدة البيانات. الكاش نفسه بيتحدث تلقائي عن طريق
-// الـ realtime (handleSegmentChange) أو لحظة إنشاء/قفل أي segment محليًا.
-// ده اللي بيمنع إحساس التهنيج/التأخير لما تدوس على أي زرار.
+// التيكر
 // ============================================================
 function startTicker() {
     if (tickInterval) clearInterval(tickInterval);
@@ -1557,8 +1700,6 @@ function startTicker() {
                 amountEl.textContent = moneyDec(amount);
             }
         }
-        // ملحوظة: مش بنجيب overallTotalAmount من قاعدة البيانات كل ثانية —
-        // ده بيتحدث بالفعل فورًا لما يحصل تغيير فعلي (طلب جديد، تبديل وضع، إغلاق جزء...)
     }, 1000);
 }
 
@@ -2427,10 +2568,10 @@ async function openStationSheet(stationId) {
         <div class="segment-breakdown">
             <div style="font-size:11px;color:var(--text-dim);font-weight:600;margin-bottom:4px;">${t('تفصيل الأجزاء السابقة', 'Previous Segments')}</div>
             ${segments.filter(s => s.ended_at).map(s => {
-                const start = new Date(s.started_at);
+                const start2 = new Date(s.started_at);
                 const end = new Date(s.ended_at);
-                const mins = Math.round((end - start) / 60000);
-                const amt = calculateSegmentAmountFromTimes(s.started_at, s.ended_at, s.rate);
+                const mins = Math.round((end - start2) / 60000);
+                const amt = (s.amount !== null && s.amount !== undefined) ? Number(s.amount) : calculateSegmentAmountFromTimes(s.started_at, s.ended_at, s.rate);
                 const modeClass = s.mode === 'single' ? 'seg-mode-single' : 'seg-mode-multi';
                 const modeLabel2 = s.mode === 'single' ? t('Single', 'Single') : t('Multi', 'Multi');
                 const segTimerType = s.timer_type || 'countup';
@@ -2446,17 +2587,19 @@ async function openStationSheet(stationId) {
         ` : ''}
         
         <div class="section-title">${t('إضافة طلب', 'Add Order')}</div>
-        <div style="display:flex;flex-wrap:wrap;gap:8px;margin-bottom:12px;" id="menuQuickAdd">
-            ${menuItems.map(m => `<button class="btn btn-ghost btn-sm" onclick="addOrderItem('${session.id}','${m.id}')">${escapeHtml(m.name)} - ${money(m.price)}</button>`).join('') || `<span style="color:var(--text-faint);font-size:13px;">${t('مفيش أصناف — ضيفها من الإعدادات', 'No items — add them from settings')}</span>`}
-        </div>
+        <div id="menuQuickAdd" style="margin-bottom:12px;"></div>
         
         <div class="section-title">${t('الطلبات', 'Orders')}</div>
         <div class="panel" id="stationOrdersList"></div>
         
         <div style="margin-top:16px;display:flex;flex-direction:column;gap:8px;">
+            ${!isCountdown ? `
             <button class="btn btn-amber btn-block" onclick="handleSwitchMode('${session.id}','${switchMode}','${st.id}')" id="switchModeBtn">
                 <i class="fa-solid fa-arrows-rotate"></i> ${switchLabel} (${money(switchRate)} ${t('ج/ساعة', 'EGP/hr')})
             </button>
+            ` : `
+            <div style="font-size:11px;color:var(--text-dim);text-align:center;padding:6px;">${t('التحويل بين Single/Multi متاح بس مع التايمر التصاعدي', 'Switching Single/Multi is only available with the count-up timer')}</div>
+            `}
             <div style="display:flex;gap:8px;">
                 <button class="btn btn-transfer" style="flex:1;" onclick="openTransferSheet('${stationId}')">
                     <i class="fa-solid fa-exchange"></i> ${t('نقل الجلسة', 'Transfer Session')}
@@ -2470,8 +2613,84 @@ async function openStationSheet(stationId) {
         </div>
         <div class="error-text" id="stationSheetError"></div>
     `;
+    
+    renderMenuQuickAdd();
     renderStationOrdersSection();
     openSheet('stationOverlay');
+}
+
+function renderMenuQuickAdd() {
+    const container = document.getElementById('menuQuickAdd');
+    if (!container) return;
+    
+    if (menuItems.length === 0) {
+        container.innerHTML = `<span style="color:var(--text-faint);font-size:13px;">${t('مفيش أصناف — ضيفها من الإعدادات', 'No items — add them from settings')}</span>`;
+        return;
+    }
+    
+    // تجميع الأصناف حسب التصنيف
+    const grouped = {};
+    menuItems.forEach(item => {
+        const category = item.category || t('أخرى', 'Other');
+        if (!grouped[category]) grouped[category] = [];
+        grouped[category].push(item);
+    });
+    
+    let html = '';
+    // تحديد أول تصنيف يبقى مفتوح
+    const categoryNames = Object.keys(grouped);
+    
+    for (let i = 0; i < categoryNames.length; i++) {
+        const category = categoryNames[i];
+        const items = grouped[category];
+        // التصنيف الأول بس هو اللي يبقى مفتوح افتراضيًا
+        const isOpen = (i === 0);
+        // حفظ الحالة
+        if (categoryToggleState[category] === undefined) {
+            categoryToggleState[category] = isOpen;
+        }
+        const open = categoryToggleState[category];
+        
+        html += `<div class="menu-category-group">`;
+        html += `<div class="menu-category-toggle" onclick="toggleCategory('${escapeHtml(category)}')">`;
+        html += `<span class="cat-title">${escapeHtml(category)}</span>`;
+        html += `<i class="fa-solid fa-chevron-down cat-arrow ${open ? 'open' : ''}"></i>`;
+        html += `</div>`;
+        html += `<div class="menu-category-items ${open ? 'open' : ''}" data-category="${escapeHtml(category)}">`;
+        items.forEach(item => {
+            const sessionId = activeSessionOrders.length > 0 ? activeSessionOrders[0].session_id : '';
+            html += `<button class="btn btn-ghost btn-sm" onclick="addOrderItem('${sessionId}','${item.id}')">${escapeHtml(item.name)} - ${money(item.price)}</button>`;
+        });
+        html += `</div></div>`;
+    }
+    
+    container.innerHTML = html;
+}
+
+function toggleCategory(category) {
+    // تغيير الحالة
+    categoryToggleState[category] = !categoryToggleState[category];
+    const isOpen = categoryToggleState[category];
+    
+    // تحديث السهم
+    const container = document.getElementById('menuQuickAdd');
+    if (!container) return;
+    const toggles = container.querySelectorAll('.menu-category-toggle');
+    toggles.forEach(toggle => {
+        const titleEl = toggle.querySelector('.cat-title');
+        if (titleEl && titleEl.textContent.trim() === category) {
+            const arrow = toggle.querySelector('.cat-arrow');
+            if (arrow) {
+                arrow.classList.toggle('open', isOpen);
+            }
+        }
+    });
+    
+    // تحديث عرض الأصناف
+    const itemsContainer = container.querySelector(`.menu-category-items[data-category="${category}"]`);
+    if (itemsContainer) {
+        itemsContainer.classList.toggle('open', isOpen);
+    }
 }
 
 function renderStationOrdersSection() {
@@ -3263,12 +3482,35 @@ function renderSettings() {
         <div class="list-row"><div class="row-title">${t('حالة الجهاز', 'Device Status')}</div><div class="badge ${deviceRecord.revoked ? 'badge-red' : 'badge-teal'}">${deviceRecord.revoked ? t('موقوف', 'Suspended') : t('نشط', 'Active')}</div></div>
         <div class="list-row"><div class="row-title">${t('تاريخ الانتهاء', 'Expiry Date')}</div><div class="row-value mono">${expiry ? expiry.toLocaleDateString(currentLang === 'ar' ? 'ar-EG' : 'en-US') : '—'}</div></div>`;
 
-    document.getElementById('settingsMenu').innerHTML = menuItems.length === 0
-        ? `<div class="empty"><i class="fa-solid fa-utensils"></i>${t('لسه مفيش أصناف', 'No items yet')}</div>`
-        : menuItems.map(m => {
-            const catMap = { 'food': t('أكل', 'Food'), 'drink': t('مشروب', 'Drink'), 'other': t('أخرى', 'Other') };
-            return `<div class="list-row"><div><div class="row-title">${escapeHtml(m.name)}</div><div class="row-sub">${catMap[m.category] || m.category}</div></div><div class="row-value mono">${money(m.price)}</div></div>`;
-        }).join('');
+    // تجميع الأصناف حسب التصنيف لعرضها في الإعدادات
+    const groupedMenu = {};
+    menuItems.forEach(item => {
+        const category = item.category || t('أخرى', 'Other');
+        if (!groupedMenu[category]) groupedMenu[category] = [];
+        groupedMenu[category].push(item);
+    });
+    
+    let menuHtml = '';
+    if (menuItems.length === 0) {
+        menuHtml = `<div class="empty"><i class="fa-solid fa-utensils"></i>${t('لسه مفيش أصناف', 'No items yet')}</div>`;
+    } else {
+        for (const [category, items] of Object.entries(groupedMenu)) {
+            menuHtml += `<div class="menu-category-group">`;
+            menuHtml += `<div class="menu-category-title" style="color:var(--teal);">${escapeHtml(category)}</div>`;
+            items.forEach(m => {
+                menuHtml += `<div class="list-row">
+                    <div><div class="row-title">${escapeHtml(m.name)}</div><div class="row-sub">${escapeHtml(m.category || t('أخرى', 'Other'))}</div></div>
+                    <div class="row-actions">
+                        <div class="row-value mono" style="margin-left:12px;">${money(m.price)}</div>
+                        <button class="btn btn-ghost btn-sm" onclick="editMenuItem('${m.id}')"><i class="fa-solid fa-pen"></i></button>
+                        <button class="btn btn-danger-sm" onclick="deleteMenuItemById('${m.id}')"><i class="fa-solid fa-trash"></i></button>
+                    </div>
+                </div>`;
+            });
+            menuHtml += `</div>`;
+        }
+    }
+    document.getElementById('settingsMenu').innerHTML = menuHtml;
 
     document.getElementById('settingsEmployees').innerHTML = employees.length === 0
         ? `<div class="empty"><i class="fa-solid fa-user-group"></i>${t('لسه مفيش موظفين', 'No employees yet')}</div>`
@@ -3284,15 +3526,114 @@ function renderSettings() {
             </div>`).join('');
 }
 
-function openMenuItemSheet() { document.getElementById('menuItemName').value = ''; document.getElementById('menuItemPrice').value = ''; document.getElementById('menuItemError').textContent = ''; openSheet('menuItemOverlay'); }
+function openMenuItemSheet() {
+    document.getElementById('menuItemId').value = '';
+    document.getElementById('menuItemName').value = '';
+    document.getElementById('menuItemPrice').value = '';
+    document.getElementById('menuItemCategory').value = 'مشروبات باردة';
+    document.getElementById('menuDeleteBtn').style.display = 'none';
+    document.getElementById('menuItemError').textContent = '';
+    document.getElementById('menuItemSheetTitle').textContent = t('إضافة صنف للقائمة', 'Add Menu Item');
+    openSheet('menuItemOverlay');
+}
+
+function editMenuItem(itemId) {
+    const item = menuItems.find(m => m.id === itemId);
+    if (!item) return;
+    document.getElementById('menuItemId').value = item.id;
+    document.getElementById('menuItemName').value = item.name;
+    document.getElementById('menuItemPrice').value = item.price;
+    document.getElementById('menuItemCategory').value = item.category || 'مشروبات باردة';
+    document.getElementById('menuDeleteBtn').style.display = 'flex';
+    document.getElementById('menuItemError').textContent = '';
+    document.getElementById('menuItemSheetTitle').textContent = t('تعديل صنف', 'Edit Item');
+    openSheet('menuItemOverlay');
+}
+
 async function submitMenuItem() {
+    const id = document.getElementById('menuItemId').value;
     const name = document.getElementById('menuItemName').value.trim();
     const price = parseFloat(document.getElementById('menuItemPrice').value);
-    const category = document.getElementById('menuItemCategory').value;
-    if (!name || isNaN(price)) { document.getElementById('menuItemError').textContent = t('اكمل البيانات.', 'Complete the data.'); return; }
-    await supabaseClient.from('menu_items').insert({ business_id: business.id, name, price, category });
-    closeSheet('menuItemOverlay'); showToast(t('تمت الإضافة', 'Item added'), 'success');
-    await loadMenuItems(); renderSettings();
+    const category = document.getElementById('menuItemCategory').value.trim() || t('أخرى', 'Other');
+    const errEl = document.getElementById('menuItemError');
+    errEl.textContent = '';
+    
+    if (!name || isNaN(price) || price < 0) { 
+        errEl.textContent = t('اكمل البيانات.', 'Complete the data.'); 
+        return; 
+    }
+    
+    try {
+        const newItem = {
+            business_id: business.id,
+            name: name,
+            price: price,
+            category: category,
+            active: true,
+            created_at: new Date().toISOString()
+        };
+        
+        let result;
+        if (id) {
+            result = await updateMenuItemInDB(id, { name, price, category });
+            if (result) {
+                const idx = menuItems.findIndex(item => item.id === id);
+                if (idx !== -1) {
+                    menuItems[idx] = { ...menuItems[idx], name, price, category };
+                }
+                showToast(t('تم تحديث الصنف', 'Item updated'), 'success');
+            } else {
+                throw new Error('Update failed');
+            }
+        } else {
+            result = await saveMenuItemToDB(newItem);
+            if (result) {
+                menuItems.push(result);
+                showToast(t('تمت الإضافة', 'Item added'), 'success');
+            } else {
+                throw new Error('Insert failed');
+            }
+        }
+        
+        closeSheet('menuItemOverlay');
+        renderSettings();
+        renderMenuQuickAdd();
+        renderStationOrdersSection();
+    } catch (e) {
+        console.error('Error in submitMenuItem:', e);
+        let errorMsg = e.message || 'Unknown error';
+        if (errorMsg.includes('check constraint') || errorMsg.includes('menu_items_category_check')) {
+            errorMsg = 'مشكلة في قاعدة البيانات: عمود التصنيف لا يقبل هذه القيمة. جرب تصنيف آخر أو استخدم localStorage.';
+        }
+        errEl.textContent = t('حصل خطأ: ' + errorMsg, 'Error: ' + errorMsg);
+        showToast(t('فشل حفظ الصنف: ' + errorMsg, 'Failed to save item: ' + errorMsg), 'error');
+    }
+}
+
+async function deleteMenuItemById(itemId) {
+    if (!confirm(t('هل أنت متأكد من حذف هذا الصنف؟', 'Are you sure you want to delete this item?'))) return;
+    try {
+        const success = await deleteMenuItemFromDB(itemId);
+        if (success) {
+            menuItems = menuItems.filter(item => item.id !== itemId);
+            showToast(t('تم حذف الصنف', 'Item deleted'), 'success');
+            renderSettings();
+            renderMenuQuickAdd();
+            renderStationOrdersSection();
+        } else {
+            throw new Error('Delete failed');
+        }
+    } catch (e) {
+        showToast(t('فشل حذف الصنف', 'Failed to delete item'), 'error');
+        console.error(e);
+    }
+}
+
+async function deleteMenuItem() {
+    const id = document.getElementById('menuItemId').value;
+    if (!id) return;
+    closeSheet('menuItemOverlay');
+    await deleteMenuItemById(id);
 }
 
 function openEmployeeSheet() {
@@ -3346,9 +3687,6 @@ function escapeHtml(str) {
 // ============================================================
 // SESSION RECOVERY
 // ============================================================
-// ============================================================
-// SESSION RECOVERY
-// ============================================================
 async function recoverActiveSession() {
     if (!business) return;
     const { data: activeSessions } = await supabaseClient
@@ -3359,10 +3697,7 @@ async function recoverActiveSession() {
 
     if (activeSessions && activeSessions.length > 0) {
         activeSessions.forEach(s => { sessions[s.station_id] = s; });
-
-        // نجيب كل الـ segments النشطة لكل الجلسات دفعة واحدة بطلب واحد، بدل طلب لكل جلسة لوحدها
         await preloadActiveSegments(activeSessions.map(s => s.id));
-
         const missing = activeSessions.filter(s => !getActiveSegmentFast(s.id));
         if (missing.length > 0) {
             await Promise.all(missing.map(s => {
@@ -3372,14 +3707,13 @@ async function recoverActiveSession() {
                 return createSegment(s.id, mode, s.started_at, rate, s.timer_type || 'countup', 0);
             }));
         }
-
         renderStationsGrid();
         renderDashboard();
     }
 }
 
 // ============================================================
-// REFRESH STATION SHEET CONTENT - تحديث المحتوى بدون إغلاق الشيت
+// REFRESH STATION SHEET CONTENT
 // ============================================================
 async function refreshStationSheetContent(stationId) {
     const st = stations.find(s => s.id === stationId);
@@ -3389,7 +3723,6 @@ async function refreshStationSheetContent(stationId) {
     const body = document.getElementById('stationSheetBody');
     if (!body) return;
     
-    // جيب أحدث البيانات
     const segments = await getSessionSegments(session.id);
     const activeSeg = segments.find(s => !s.ended_at);
     const totals = await calculateTotalAmounts(session.id);
@@ -3449,7 +3782,7 @@ async function refreshStationSheetContent(stationId) {
                 const start2 = new Date(s.started_at);
                 const end = new Date(s.ended_at);
                 const mins = Math.round((end - start2) / 60000);
-                const amt = calculateSegmentAmountFromTimes(s.started_at, s.ended_at, s.rate);
+                const amt = (s.amount !== null && s.amount !== undefined) ? Number(s.amount) : calculateSegmentAmountFromTimes(s.started_at, s.ended_at, s.rate);
                 const modeClass = s.mode === 'single' ? 'seg-mode-single' : 'seg-mode-multi';
                 const modeLabel2 = s.mode === 'single' ? t('Single', 'Single') : t('Multi', 'Multi');
                 const segTimerType = s.timer_type || 'countup';
@@ -3465,17 +3798,19 @@ async function refreshStationSheetContent(stationId) {
         ` : ''}
         
         <div class="section-title">${t('إضافة طلب', 'Add Order')}</div>
-        <div style="display:flex;flex-wrap:wrap;gap:8px;margin-bottom:12px;" id="menuQuickAdd">
-            ${menuItems.map(m => `<button class="btn btn-ghost btn-sm" onclick="addOrderItem('${session.id}','${m.id}')">${escapeHtml(m.name)} - ${money(m.price)}</button>`).join('') || `<span style="color:var(--text-faint);font-size:13px;">${t('مفيش أصناف — ضيفها من الإعدادات', 'No items — add them from settings')}</span>`}
-        </div>
+        <div id="menuQuickAdd" style="margin-bottom:12px;"></div>
         
         <div class="section-title">${t('الطلبات', 'Orders')}</div>
         <div class="panel" id="stationOrdersList"></div>
         
         <div style="margin-top:16px;display:flex;flex-direction:column;gap:8px;">
+            ${!isCountdown ? `
             <button class="btn btn-amber btn-block" onclick="handleSwitchMode('${session.id}','${switchMode}','${st.id}')" id="switchModeBtn">
                 <i class="fa-solid fa-arrows-rotate"></i> ${switchLabel} (${money(switchRate)} ${t('ج/ساعة', 'EGP/hr')})
             </button>
+            ` : `
+            <div style="font-size:11px;color:var(--text-dim);text-align:center;padding:6px;">${t('التحويل بين Single/Multi متاح بس مع التايمر التصاعدي', 'Switching Single/Multi is only available with the count-up timer')}</div>
+            `}
             <div style="display:flex;gap:8px;">
                 <button class="btn btn-transfer" style="flex:1;" onclick="openTransferSheet('${stationId}')">
                     <i class="fa-solid fa-exchange"></i> ${t('نقل الجلسة', 'Transfer Session')}
@@ -3489,11 +3824,13 @@ async function refreshStationSheetContent(stationId) {
         </div>
         <div class="error-text" id="stationSheetError"></div>
     `;
+    
+    renderMenuQuickAdd();
     renderStationOrdersSection();
 }
 
 // ============================================================
-// SWITCH MODE - UPDATED (No page refresh, smooth transition)
+// SWITCH MODE - UPDATED
 // ============================================================
 async function handleSwitchMode(sessionId, newMode, stationId) {
     if (pendingSwitch) return;
@@ -3504,9 +3841,28 @@ async function handleSwitchMode(sessionId, newMode, stationId) {
     if (btn) btn.disabled = true;
 
     try {
-        const activeSeg = await getActiveSegment(sessionId);
+        let activeSeg = await getActiveSegment(sessionId);
+
+        if (activeSeg && activeSeg.timer_type === 'countdown') {
+            showToast(t('التحويل غير متاح مع التايمر التنازلي حاليًا', 'Switching is not available with the countdown timer right now'), 'error');
+            pendingSwitch = false;
+            if (btn) btn.disabled = false;
+            return;
+        }
+
         if (!activeSeg) {
-            showToast(t('مفيش جزء نشط للتحويل', 'No active segment to switch'), 'error');
+            const session = sessions[stationId];
+            const st = stations.find(s => s.id === stationId);
+            const recoveryMode = (session && session.current_mode) || 'single';
+            const recoveryRate = (session && session.rate) || (recoveryMode === 'single' ? (st?.single_rate || 20) : (st?.multi_rate || 30));
+            const recoveryTimerType = (session && session.timer_type) || 'countup';
+            try {
+                activeSeg = await createSegment(sessionId, recoveryMode, new Date().toISOString(), recoveryRate, recoveryTimerType, 0);
+                showToast(t('تم تصحيح حالة الجلسة، جرب التحويل تاني لو محتاج', 'Session state fixed, try switching again if needed'), 'success');
+                await refreshStationSheetContent(stationId);
+            } catch (e) {
+                showToast(t('مقدرش أصلح حالة الجلسة، جرب تاني', "Couldn't fix session state, try again"), 'error');
+            }
             pendingSwitch = false;
             if (btn) btn.disabled = false;
             return;
@@ -3514,27 +3870,25 @@ async function handleSwitchMode(sessionId, newMode, stationId) {
 
         const now = new Date().toISOString();
         const start = new Date(activeSeg.started_at);
-        let hours = Math.max(0, (new Date(now) - start) / 3600000);
-        let amount = Math.round((hours * Number(activeSeg.rate)) * 100) / 100;
         let usedSeconds = (new Date(now) - start) / 1000;
+        let hours = usedSeconds / 3600;
+        let amount = Math.round((hours * Number(activeSeg.rate)) * 100) / 100;
 
         if (activeSeg.timer_type === 'countdown' && activeSeg.duration_seconds) {
             usedSeconds = Math.min(usedSeconds, activeSeg.duration_seconds);
             hours = usedSeconds / 3600;
             amount = Math.round((hours * Number(activeSeg.rate)) * 100) / 100;
         }
-        
-        await closeSegment(activeSeg.id, now, amount);
 
         const st = stations.find(s => s.id === stationId);
         const newRate = newMode === 'single' ? (st.single_rate || 20) : (st.multi_rate || 30);
         const timerType = activeSeg.timer_type || 'countup';
-        // لو كاونتداون: الجزء الجديد لازم يكمل بالوقت المتبقي فعليًا، مش يرجع للمدة الكاملة من الأول
         const durationSeconds = timerType === 'countdown'
-            ? Math.max(0, (activeSeg.duration_seconds || 0) - usedSeconds)
-            : (activeSeg.duration_seconds || 0);
+            ? Math.max(0, Math.round((activeSeg.duration_seconds || 0) - usedSeconds))
+            : Math.round(activeSeg.duration_seconds || 0);
 
         await createSegment(sessionId, newMode, now, newRate, timerType, durationSeconds);
+        await closeSegment(activeSeg.id, now, amount);
 
         await supabaseClient.from('sessions')
             .update({ current_mode: newMode, rate: newRate })
@@ -3547,7 +3901,6 @@ async function handleSwitchMode(sessionId, newMode, stationId) {
 
         showToast(t('تم التحويل إلى ' + (newMode === 'single' ? 'Single' : 'Multi'), 'Switched to ' + (newMode === 'single' ? 'Single' : 'Multi')), 'success');
         
-        // تحديث الشيت بدون إغلاقه
         await refreshStationSheetContent(stationId);
         
     } catch (e) {
@@ -3561,5 +3914,12 @@ async function handleSwitchMode(sessionId, newMode, stationId) {
 }
 </script>
 
+<!-- bottom nav -->
+<div class="bottom-nav">
+    <button class="nav-btn active" data-view="view-dashboard" onclick="navigateTo('view-dashboard')"><i class="fa-solid fa-chart-simple"></i><span data-ar="الرئيسية" data-en="Home">الرئيسية</span></button>
+    <button class="nav-btn" data-view="view-stations" onclick="navigateTo('view-stations')"><i class="fa-solid fa-gamepad"></i><span data-ar="الأجهزة" data-en="Devices">الأجهزة</span></button>
+    <button class="nav-btn" data-view="view-shift" onclick="navigateTo('view-shift')"><i class="fa-solid fa-clock"></i><span data-ar="الشيفت" data-en="Shift">الشيفت</span></button>
+    <button class="nav-btn" data-view="view-settings" onclick="navigateTo('view-settings')"><i class="fa-solid fa-gear"></i><span data-ar="الإعدادات" data-en="Settings">الإعدادات</span></button>
+</div>
 </body>
 </html>
