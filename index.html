@@ -809,8 +809,8 @@ button:focus-visible, a:focus-visible, input:focus-visible, select:focus-visible
 // ============================================================
 // CONFIG
 // ============================================================
-const SUPABASE_URL = 'https://fhjhtgbvtkuhhzitvxtx.supabase.co';
-const SUPABASE_ANON_KEY = 'sb_publishable_X0aLD3gjXGqC_no4gW78ng_TWztP5cd';
+const SUPABASE_URL = 'https://hdrvqgicxxgfolozxgjp.supabase.co';
+const SUPABASE_ANON_KEY = 'sb_publishable_dGNw7eTTempKBdFmAZRjYA_eaeEE2jj';
 const supabaseClient = window.supabase.createClient(SUPABASE_URL, SUPABASE_ANON_KEY);
 
 // ============================================================
@@ -910,6 +910,7 @@ let activeSessionOrders = [];
 let selectedPaymentMethod = null;
 let endSessionStationId = null;
 let sessionSegmentsCache = {};
+let activeSegmentCache = {};
 let pendingSwitch = false;
 let transferSourceStationId = null;
 let countdownTimers = {};
@@ -1260,6 +1261,7 @@ async function createSegment(sessionId, mode, startedAt, rate, timerType, durati
     }).select().single();
     if (error) throw error;
     sessionSegmentsCache[sessionId] = null;
+    activeSegmentCache[sessionId] = data;
     return data;
 }
 
@@ -1269,16 +1271,11 @@ async function closeSegment(segmentId, endedAt, amount) {
         .eq('id', segmentId);
     if (error) throw error;
     sessionSegmentsCache = {};
-}
-
-// نسخة "خفيفة" من getActiveSegment بتستخدم الكاش (getSessionSegments) بدل ما تعمل
-// طلب شبكة جديد لقاعدة البيانات في كل مرة. الكاش بيتصفّر تلقائي أول ما يحصل تغيير حقيقي
-// (عن طريق الـ realtime subscription)، فمفيش خطر إننا نعرض بيانات قديمة.
-// استخدامها في التيكر (اللي بيشتغل كل ثانية لكل الأجهزة) بيقلل الحمل على الشبكة بشكل كبير
-// وده كان سبب رئيسي محتمل في إحساس تقفيل/تهنيج الموقع، خصوصًا مع عدد أجهزة كبير أو نت ضعيف.
-async function getActiveSegmentFast(sessionId) {
-    const segments = await getSessionSegments(sessionId);
-    return segments.find(s => !s.ended_at) || null;
+    for (const sid in activeSegmentCache) {
+        if (activeSegmentCache[sid] && activeSegmentCache[sid].id === segmentId) {
+            activeSegmentCache[sid] = null;
+        }
+    }
 }
 
 async function getActiveSegment(sessionId) {
@@ -1289,10 +1286,33 @@ async function getActiveSegment(sessionId) {
             .eq('session_id', sessionId)
             .is('ended_at', null)
             .maybeSingle();
+        activeSegmentCache[sessionId] = data || null;
         return data;
     } catch (e) {
         console.warn('Error getting active segment:', e);
-        return null;
+        return activeSegmentCache[sessionId] || null;
+    }
+}
+
+// نسخة خفيفة: بتقرا من الكاش المحلي على طول من غير أي طلب شبكة.
+// مستخدمة في التيكر اللي بيشتغل كل ثانية عشان محدش يضرب قاعدة البيانات كل ثانية.
+function getActiveSegmentFast(sessionId) {
+    return activeSegmentCache[sessionId] || null;
+}
+
+// تحميل كل الـ segments النشطة (المفتوحة) لكل الجلسات دفعة واحدة بطلب شبكة واحد بس،
+// بدل ما نعمل طلب منفصل لكل جلسة.
+async function preloadActiveSegments(sessionIds) {
+    if (!sessionIds || sessionIds.length === 0) return;
+    try {
+        const { data } = await supabaseClient
+            .from('session_segments')
+            .select('*')
+            .in('session_id', sessionIds)
+            .is('ended_at', null);
+        (data || []).forEach(seg => { activeSegmentCache[seg.session_id] = seg; });
+    } catch (e) {
+        console.warn('Error preloading active segments:', e);
     }
 }
 
@@ -1311,21 +1331,8 @@ async function calculateTotalAmounts(sessionId) {
         if (seg.ended_at) {
             const start = new Date(seg.started_at);
             const end = new Date(seg.ended_at);
-            // بالنسبة للتايمر التنازلي (countdown)، المبلغ المخزّن في seg.amount وقت القفل
-            // بيكون محسوب على أساس الوقت المستخدم الفعلي مسقوف بمدة الكاونتداون (duration_seconds)،
-            // مش الفرق الخام بين started_at و ended_at. فلازم نستخدم seg.amount المخزّن بدل
-            // ما نعيد حسابه من الأوقات الخام، عشان الإجمالي (وبالتالي إجمالي الشيفت) يطابق فعلاً
-            // اللي اتحصّل من العميل، حتى لو الموظف قفل الجلسة متأخر عن نهاية الكاونتداون.
-            let hours = (end - start) / 3600000;
-            let amount;
-            if (seg.amount !== null && seg.amount !== undefined) {
-                amount = Number(seg.amount);
-                if (seg.timer_type === 'countdown' && seg.duration_seconds) {
-                    hours = Math.min(hours, seg.duration_seconds / 3600);
-                }
-            } else {
-                amount = Math.round((hours * Number(seg.rate)) * 100) / 100;
-            }
+            const hours = (end - start) / 3600000;
+            const amount = Math.round((hours * Number(seg.rate)) * 100) / 100;
             if (seg.mode === 'single') {
                 singleTotal += amount;
                 singleDuration += hours;
@@ -1353,7 +1360,7 @@ async function calculateTotalAmounts(sessionId) {
 }
 
 async function getCurrentSegmentEstimate(sessionId) {
-    const activeSeg = await getActiveSegmentFast(sessionId);
+    const activeSeg = await getActiveSegment(sessionId);
     if (!activeSeg) return { amount: 0, hours: 0, segment: null };
     
     const start = new Date(activeSeg.started_at);
@@ -1362,16 +1369,32 @@ async function getCurrentSegmentEstimate(sessionId) {
     let amount = Math.round((hours * Number(activeSeg.rate)) * 100) / 100;
     
     if (activeSeg.timer_type === 'countdown' && activeSeg.duration_seconds) {
-        // المفروض المبلغ يتحسب على أساس الوقت "المستخدم" (تصاعديًا) مسقوف بمدة الكاونتداون،
-        // بالظبط زي ما بيحصل وقت قفل الجزء (closeSegment) في switch mode / end session.
-        // قبل كده كان بيتحسب على أساس الوقت "المتبقي"، فكان المبلغ المعروض بينزل لحد صفر
-        // مع الوقت بدل ما يزيد، وده عكس المفروض.
         const elapsedSeconds = (now - start) / 1000;
-        const usedSeconds = Math.min(elapsedSeconds, activeSeg.duration_seconds);
-        hours = usedSeconds / 3600;
+        const remainingSeconds = Math.max(0, activeSeg.duration_seconds - elapsedSeconds);
+        hours = remainingSeconds / 3600;
         amount = Math.round((hours * Number(activeSeg.rate)) * 100) / 100;
     }
     
+    return { amount, hours, segment: activeSeg };
+}
+
+// نسخة خفيفة من getCurrentSegmentEstimate بتستخدم الكاش المحلي فقط (من غير طلب شبكة) — للتيكر بس
+function getCurrentSegmentEstimateFast(sessionId) {
+    const activeSeg = getActiveSegmentFast(sessionId);
+    if (!activeSeg) return { amount: 0, hours: 0, segment: null };
+
+    const start = new Date(activeSeg.started_at);
+    const now = new Date();
+    let hours = Math.max(0, (now - start) / 3600000);
+    let amount = Math.round((hours * Number(activeSeg.rate)) * 100) / 100;
+
+    if (activeSeg.timer_type === 'countdown' && activeSeg.duration_seconds) {
+        const elapsedSeconds = (now - start) / 1000;
+        const remainingSeconds = Math.max(0, activeSeg.duration_seconds - elapsedSeconds);
+        hours = remainingSeconds / 3600;
+        amount = Math.round((hours * Number(activeSeg.rate)) * 100) / 100;
+    }
+
     return { amount, hours, segment: activeSeg };
 }
 
@@ -1432,7 +1455,7 @@ function handleSessionChange(payload) {
     renderStationsGrid();
     if (document.getElementById('view-dashboard').classList.contains('active')) renderDashboard();
     if (document.getElementById('view-shift').classList.contains('active')) renderShiftView();
-    if (activeStationId === row.station_id) openStationSheet(activeStationId);
+    if (activeStationId === row.station_id && !pendingSwitch) openStationSheet(activeStationId);
 }
 
 function handleOrderChange(payload) {
@@ -1449,96 +1472,93 @@ function handleStationChange() {
 
 function handleSegmentChange(payload) {
     if (payload.new && payload.new.session_id) {
-        sessionSegmentsCache[payload.new.session_id] = null;
-        if (activeStationId) {
+        const row = payload.new;
+        sessionSegmentsCache[row.session_id] = null;
+        // حدث الكاش الخفيف على طول من نفس البيانات اللي جاية من الـ realtime، من غير أي طلب شبكة إضافي
+        activeSegmentCache[row.session_id] = row.ended_at ? null : row;
+        if (activeStationId && !pendingSwitch) {
             const session = sessions[activeStationId];
-            if (session && session.id === payload.new.session_id) {
+            if (session && session.id === row.session_id) {
                 openStationSheet(activeStationId);
             }
         }
     }
 }
 
+// ============================================================
+// التيكر - بيشتغل كل ثانية وبيقرا من الكاش المحلي بس (activeSegmentCache)
+// من غير أي طلب شبكة لقاعدة البيانات. الكاش نفسه بيتحدث تلقائي عن طريق
+// الـ realtime (handleSegmentChange) أو لحظة إنشاء/قفل أي segment محليًا.
+// ده اللي بيمنع إحساس التهنيج/التأخير لما تدوس على أي زرار.
+// ============================================================
 function startTicker() {
     if (tickInterval) clearInterval(tickInterval);
     tickInterval = setInterval(() => {
         document.querySelectorAll('.station-timer[data-start]').forEach(el => {
             const stationId = el.dataset.stationId;
             const session = sessions[stationId];
-            if (session) {
-                getActiveSegmentFast(session.id).then(activeSeg => {
-                    if (activeSeg && activeSeg.timer_type === 'countdown' && activeSeg.duration_seconds) {
-                        const remaining = getRemainingSeconds(activeSeg);
-                        el.textContent = formatCountdown(remaining);
-                        if (remaining < 300) {
-                            el.classList.add('countdown-warning');
-                        } else {
-                            el.classList.remove('countdown-warning');
-                        }
-                        el.classList.add('countdown');
-                    } else {
-                        el.textContent = formatElapsed(new Date(el.dataset.start));
-                        el.classList.remove('countdown', 'countdown-warning');
-                    }
-                });
+            if (!session) return;
+            const activeSeg = getActiveSegmentFast(session.id);
+            if (activeSeg && activeSeg.timer_type === 'countdown' && activeSeg.duration_seconds) {
+                const remaining = getRemainingSeconds(activeSeg);
+                el.textContent = formatCountdown(remaining);
+                if (remaining < 300) {
+                    el.classList.add('countdown-warning');
+                } else {
+                    el.classList.remove('countdown-warning');
+                }
+                el.classList.add('countdown');
+            } else {
+                el.textContent = formatElapsed(new Date(el.dataset.start));
+                el.classList.remove('countdown', 'countdown-warning');
             }
         });
-        
+
         const timerEl = document.getElementById('activeSessionTimer');
         if (timerEl && timerEl.dataset.start && activeStationId) {
             const session = sessions[activeStationId];
             if (session) {
-                getActiveSegmentFast(session.id).then(activeSeg => {
-                    if (activeSeg && activeSeg.timer_type === 'countdown' && activeSeg.duration_seconds) {
-                        const remaining = getRemainingSeconds(activeSeg);
-                        timerEl.textContent = formatCountdown(remaining);
-                        if (remaining < 300) {
-                            timerEl.classList.add('countdown-warning');
-                        } else {
-                            timerEl.classList.remove('countdown-warning');
-                        }
-                        timerEl.classList.add('countdown');
+                const activeSeg = getActiveSegmentFast(session.id);
+                if (activeSeg && activeSeg.timer_type === 'countdown' && activeSeg.duration_seconds) {
+                    const remaining = getRemainingSeconds(activeSeg);
+                    timerEl.textContent = formatCountdown(remaining);
+                    if (remaining < 300) {
+                        timerEl.classList.add('countdown-warning');
                     } else {
-                        timerEl.textContent = formatElapsed(new Date(timerEl.dataset.start));
-                        timerEl.classList.remove('countdown', 'countdown-warning');
+                        timerEl.classList.remove('countdown-warning');
                     }
-                });
+                    timerEl.classList.add('countdown');
+                } else {
+                    timerEl.textContent = formatElapsed(new Date(timerEl.dataset.start));
+                    timerEl.classList.remove('countdown', 'countdown-warning');
+                }
             }
         }
-        
+
         const currentSegTimer = document.getElementById('currentSegTimer');
         if (currentSegTimer && currentSegTimer.dataset.start && activeStationId) {
             const session = sessions[activeStationId];
             if (session) {
-                getActiveSegmentFast(session.id).then(activeSeg => {
-                    if (activeSeg && activeSeg.timer_type === 'countdown' && activeSeg.duration_seconds) {
-                        const remaining = getRemainingSeconds(activeSeg);
-                        currentSegTimer.textContent = formatCountdown(remaining);
-                    } else {
-                        currentSegTimer.textContent = formatElapsed(new Date(currentSegTimer.dataset.start));
-                    }
-                });
+                const activeSeg = getActiveSegmentFast(session.id);
+                if (activeSeg && activeSeg.timer_type === 'countdown' && activeSeg.duration_seconds) {
+                    const remaining = getRemainingSeconds(activeSeg);
+                    currentSegTimer.textContent = formatCountdown(remaining);
+                } else {
+                    currentSegTimer.textContent = formatElapsed(new Date(currentSegTimer.dataset.start));
+                }
             }
         }
-        
+
         const amountEl = document.getElementById('currentSegAmount');
         if (amountEl && activeStationId) {
             const session = sessions[activeStationId];
             if (session) {
-                getCurrentSegmentEstimate(session.id).then(({ amount }) => {
-                    amountEl.textContent = moneyDec(amount);
-                });
+                const { amount } = getCurrentSegmentEstimateFast(session.id);
+                amountEl.textContent = moneyDec(amount);
             }
         }
-        const totalEl = document.getElementById('overallTotalAmount');
-        if (totalEl && activeStationId) {
-            const session = sessions[activeStationId];
-            if (session) {
-                calculateTotalAmounts(session.id).then(({ grandTotal }) => {
-                    totalEl.textContent = moneyDec(grandTotal);
-                });
-            }
-        }
+        // ملحوظة: مش بنجيب overallTotalAmount من قاعدة البيانات كل ثانية —
+        // ده بيتحدث بالفعل فورًا لما يحصل تغيير فعلي (طلب جديد، تبديل وضع، إغلاق جزء...)
     }, 1000);
 }
 
@@ -2129,39 +2149,10 @@ async function confirmTransfer() {
     if (!confirm(confirmMsg)) return;
     
     try {
-        // تحديد الوضع الحالي (Single / Multi) الصح عشان نستخدم سعر الجهاز المستهدف المناسب،
-        // مش سعر Single بس زي ما كان بيحصل قبل كده (كان بيثبت single_rate حتى لو الجلسة Multi).
-        const activeSeg = await getActiveSegmentFast(sourceSession.id);
-        const currentMode = activeSeg ? activeSeg.mode : (sourceSession.current_mode || 'single');
-        const newRate = currentMode === 'single' ? (targetStation.single_rate || 20) : (targetStation.multi_rate || 30);
-
-        const now = new Date().toISOString();
-
-        // لو فيه جزء (segment) شغال، لازم نقفله على سعر ووقت الجهاز المصدر (اللي فعلاً اتقضّى فيه)
-        // ونفتح جزء جديد على الجهاز المستهدف بسعره الصحيح لنفس الوضع (Single/Multi)، بالظبط
-        // زي منطق تبديل الوضع، عشان الفاتورة تكون دقيقة من لحظة النقل.
-        if (activeSeg) {
-            const start = new Date(activeSeg.started_at);
-            let hours = Math.max(0, (new Date(now) - start) / 3600000);
-            let amount = Math.round((hours * Number(activeSeg.rate)) * 100) / 100;
-            let durationSeconds = activeSeg.duration_seconds || 0;
-
-            if (activeSeg.timer_type === 'countdown' && activeSeg.duration_seconds) {
-                const elapsedSeconds = (new Date(now) - start) / 1000;
-                const usedSeconds = Math.min(elapsedSeconds, activeSeg.duration_seconds);
-                hours = usedSeconds / 3600;
-                amount = Math.round((hours * Number(activeSeg.rate)) * 100) / 100;
-                durationSeconds = Math.max(0, Math.round(activeSeg.duration_seconds - usedSeconds));
-            }
-
-            await closeSegment(activeSeg.id, now, amount);
-            await createSegment(sourceSession.id, currentMode, now, newRate, activeSeg.timer_type || 'countup', durationSeconds);
-        }
-
         const { error: updateError } = await supabaseClient.from('sessions')
             .update({ 
                 station_id: targetStationId,
-                rate: newRate
+                rate: targetStation.single_rate || 20
             })
             .eq('id', sourceSession.id);
         
@@ -2171,7 +2162,7 @@ async function confirmTransfer() {
         sessions[targetStationId] = {
             ...sourceSession,
             station_id: targetStationId,
-            rate: newRate
+            rate: targetStation.single_rate || 20
         };
         
         closeSheet('transferOverlay');
@@ -2439,12 +2430,7 @@ async function openStationSheet(stationId) {
                 const start = new Date(s.started_at);
                 const end = new Date(s.ended_at);
                 const mins = Math.round((end - start) / 60000);
-                // استخدام المبلغ المخزّن (s.amount) بدل إعادة الحساب من الأوقات الخام،
-                // عشان لو الجزء كان تايمر تنازلي والموظف قفل متأخر شوية، المبلغ المعروض
-                // هنا يفضل مطابق للمبلغ اللي فعلاً اتحسب واتحصّل وقت القفل.
-                const amt = (s.amount !== null && s.amount !== undefined)
-                    ? Number(s.amount)
-                    : calculateSegmentAmountFromTimes(s.started_at, s.ended_at, s.rate);
+                const amt = calculateSegmentAmountFromTimes(s.started_at, s.ended_at, s.rate);
                 const modeClass = s.mode === 'single' ? 'seg-mode-single' : 'seg-mode-multi';
                 const modeLabel2 = s.mode === 'single' ? t('Single', 'Single') : t('Multi', 'Multi');
                 const segTimerType = s.timer_type || 'countup';
@@ -2557,78 +2543,6 @@ async function startSessionWithMode(stationId) {
     } catch (e) {
         console.error('Error starting session:', e);
         errEl.textContent = t('فشل بدء الجلسة', 'Failed to start session');
-    }
-}
-
-// ============================================================
-// SWITCH MODE
-// ============================================================
-async function handleSwitchMode(sessionId, newMode, stationId) {
-    if (pendingSwitch) return;
-    pendingSwitch = true;
-    const errEl = document.getElementById('stationSheetError');
-    errEl.textContent = '';
-    const btn = document.getElementById('switchModeBtn');
-    if (btn) btn.disabled = true;
-
-    try {
-        const activeSeg = await getActiveSegment(sessionId);
-        if (!activeSeg) {
-            showToast(t('مفيش جزء نشط للتحويل', 'No active segment to switch'), 'error');
-            pendingSwitch = false;
-            if (btn) btn.disabled = false;
-            return;
-        }
-
-        const now = new Date().toISOString();
-        const start = new Date(activeSeg.started_at);
-        let hours = Math.max(0, (new Date(now) - start) / 3600000);
-        let amount = Math.round((hours * Number(activeSeg.rate)) * 100) / 100;
-        let usedSecondsForSwitch = 0;
-        
-        if (activeSeg.timer_type === 'countdown' && activeSeg.duration_seconds) {
-            const elapsedSeconds = (new Date(now) - start) / 1000;
-            usedSecondsForSwitch = Math.min(elapsedSeconds, activeSeg.duration_seconds);
-            hours = usedSecondsForSwitch / 3600;
-            amount = Math.round((hours * Number(activeSeg.rate)) * 100) / 100;
-        }
-        
-        await closeSegment(activeSeg.id, now, amount);
-
-        const st = stations.find(s => s.id === stationId);
-        const newRate = newMode === 'single' ? (st.single_rate || 20) : (st.multi_rate || 30);
-        
-        const timerType = activeSeg.timer_type || 'countup';
-        // مهم: لو التايمر تنازلي (countdown)، لازم الجزء الجديد بعد التحويل يكمل بالوقت
-        // "المتبقي" مش يرجع للمدة الأصلية الكاملة تاني. قبل كده كان بيتبعت
-        // activeSeg.duration_seconds (المدة الكاملة) للجزء الجديد، فكل تحويل وضع كان
-        // بيصفّر الكاونتداون ويرجعه للمدة الكاملة من الأول — يعني العميل ياخد وقت إضافي مجاني.
-        let durationSeconds = activeSeg.duration_seconds || 0;
-        if (timerType === 'countdown' && activeSeg.duration_seconds) {
-            durationSeconds = Math.max(0, Math.round(activeSeg.duration_seconds - usedSecondsForSwitch));
-        }
-
-        await createSegment(sessionId, newMode, now, newRate, timerType, durationSeconds);
-
-        await supabaseClient.from('sessions')
-            .update({ current_mode: newMode, rate: newRate })
-            .eq('id', sessionId);
-
-        if (sessions[stationId]) {
-            sessions[stationId].current_mode = newMode;
-            sessions[stationId].rate = newRate;
-        }
-
-        showToast(t('تم التحويل إلى ' + (newMode === 'single' ? 'Single' : 'Multi'), 'Switched to ' + (newMode === 'single' ? 'Single' : 'Multi')), 'success');
-        
-        await openStationSheet(stationId);
-    } catch (e) {
-        console.error('Error switching mode:', e);
-        errEl.textContent = t('فشل التحويل، حاول تاني.', 'Switch failed, try again.');
-        showToast(t('فشل التحويل: ' + e.message, 'Switch failed: ' + e.message), 'error');
-    } finally {
-        pendingSwitch = false;
-        if (btn) btn.disabled = false;
     }
 }
 
@@ -3432,6 +3346,9 @@ function escapeHtml(str) {
 // ============================================================
 // SESSION RECOVERY
 // ============================================================
+// ============================================================
+// SESSION RECOVERY
+// ============================================================
 async function recoverActiveSession() {
     if (!business) return;
     const { data: activeSessions } = await supabaseClient
@@ -3439,20 +3356,207 @@ async function recoverActiveSession() {
         .select('*')
         .eq('business_id', business.id)
         .eq('status', 'active');
-    
+
     if (activeSessions && activeSessions.length > 0) {
-        for (const s of activeSessions) {
-            sessions[s.station_id] = s;
-            const activeSeg = await getActiveSegment(s.id);
-            if (!activeSeg) {
+        activeSessions.forEach(s => { sessions[s.station_id] = s; });
+
+        // نجيب كل الـ segments النشطة لكل الجلسات دفعة واحدة بطلب واحد، بدل طلب لكل جلسة لوحدها
+        await preloadActiveSegments(activeSessions.map(s => s.id));
+
+        const missing = activeSessions.filter(s => !getActiveSegmentFast(s.id));
+        if (missing.length > 0) {
+            await Promise.all(missing.map(s => {
                 const st = stations.find(st => st.id === s.station_id);
                 const mode = s.current_mode || 'single';
                 const rate = mode === 'single' ? (st?.single_rate || 20) : (st?.multi_rate || 30);
-                await createSegment(s.id, mode, s.started_at, rate, s.timer_type || 'countup', 0);
-            }
+                return createSegment(s.id, mode, s.started_at, rate, s.timer_type || 'countup', 0);
+            }));
         }
+
         renderStationsGrid();
         renderDashboard();
+    }
+}
+
+// ============================================================
+// REFRESH STATION SHEET CONTENT - تحديث المحتوى بدون إغلاق الشيت
+// ============================================================
+async function refreshStationSheetContent(stationId) {
+    const st = stations.find(s => s.id === stationId);
+    const session = sessions[stationId];
+    if (!session || !st) return;
+    
+    const body = document.getElementById('stationSheetBody');
+    if (!body) return;
+    
+    // جيب أحدث البيانات
+    const segments = await getSessionSegments(session.id);
+    const activeSeg = segments.find(s => !s.ended_at);
+    const totals = await calculateTotalAmounts(session.id);
+    const currentEstimate = await getCurrentSegmentEstimate(session.id);
+    
+    const currentMode = activeSeg ? activeSeg.mode : (session.current_mode || 'single');
+    const currentRate = activeSeg ? activeSeg.rate : (st.single_rate || 20);
+    const modeLabel = currentMode === 'single' ? t('Single', 'Single') : t('Multi', 'Multi');
+    const modeBadgeClass = currentMode === 'single' ? 'badge-mode-single' : 'badge-mode-multi';
+    const switchLabel = currentMode === 'single' ? t('تحويل إلى Multi', 'Switch to Multi') : t('تحويل إلى Single', 'Switch to Single');
+    const switchMode = currentMode === 'single' ? 'multi' : 'single';
+    const switchRate = switchMode === 'single' ? (st.single_rate || 20) : (st.multi_rate || 30);
+    
+    const timerType = activeSeg ? (activeSeg.timer_type || 'countup') : 'countup';
+    const timerLabel = timerType === 'countdown' ? t('تنازلي', 'Countdown') : t('تصاعدي', 'Count Up');
+    const timerBadgeClass = timerType === 'countdown' ? 'badge-timer-down' : 'badge-timer-up';
+    const isCountdown = timerType === 'countdown';
+
+    const { data: orders } = await supabaseClient.from('session_orders').select('*').eq('session_id', session.id).order('created_at');
+    activeSessionOrders = orders || [];
+
+    const activeSegStart = activeSeg ? activeSeg.started_at : session.started_at;
+    
+    body.innerHTML = `
+        <div style="text-align:center;margin-bottom:12px;">
+            <div style="display:flex;justify-content:center;gap:8px;align-items:center;flex-wrap:wrap;">
+                <span class="badge ${modeBadgeClass}" style="font-size:13px;padding:4px 14px;">${modeLabel}</span>
+                <span class="badge ${timerBadgeClass}" style="font-size:11px;padding:3px 10px;">${timerLabel}</span>
+                <span class="badge badge-teal" style="font-size:13px;padding:4px 14px;">${money(currentRate)} ${t('ج/ساعة', 'EGP/hr')}</span>
+            </div>
+        </div>
+        <div style="display:grid;grid-template-columns:1fr 1fr;gap:10px;margin-bottom:12px;">
+            <div class="stat-card" style="padding:10px;">
+                <div class="stat-label" style="font-size:10px;">${isCountdown ? t('الوقت المتبقي', 'Time Remaining') : t('إجمالي الجلسة', 'Total Session')}</div>
+                <div class="station-timer mono ${isCountdown ? 'countdown' : ''}" style="font-size:22px;" id="activeSessionTimer" data-start="${session.started_at}" data-station-id="${stationId}">${isCountdown ? formatCountdown(getRemainingSeconds(activeSeg)) : formatElapsed(new Date(session.started_at))}</div>
+            </div>
+            <div class="stat-card" style="padding:10px;border-color:${currentMode === 'single' ? 'var(--amber-dim)' : 'var(--teal-dim)'};">
+                <div class="stat-label" style="font-size:10px;">${t('الجزء الحالي', 'Current Segment')}</div>
+                <div class="station-timer mono" style="font-size:22px;color:${currentMode === 'single' ? 'var(--amber)' : 'var(--teal)'};" id="currentSegTimer" data-start="${activeSegStart}">${formatElapsed(new Date(activeSegStart))}</div>
+            </div>
+        </div>
+        <div style="display:grid;grid-template-columns:1fr 1fr;gap:10px;margin-bottom:12px;">
+            <div style="background:var(--bg-sunken);border-radius:var(--radius-sm);padding:8px;text-align:center;">
+                <div style="font-size:10px;color:var(--text-dim);">${isCountdown ? t('قيمة الوقت المتبقي', 'Remaining Value') : t('قيمة الجزء الحالي', 'Current Segment Value')}</div>
+                <div class="mono" style="font-size:18px;font-weight:700;color:${currentMode === 'single' ? 'var(--amber)' : 'var(--teal)'};" id="currentSegAmount">${moneyDec(currentEstimate.amount)}</div>
+            </div>
+            <div style="background:var(--bg-sunken);border-radius:var(--radius-sm);padding:8px;text-align:center;">
+                <div style="font-size:10px;color:var(--text-dim);">${t('الإجمالي الكلي', 'Grand Total')}</div>
+                <div class="mono" style="font-size:18px;font-weight:700;color:var(--amber);" id="overallTotalAmount">${moneyDec(totals.grandTotal)}</div>
+            </div>
+        </div>
+        
+        ${segments.filter(s => s.ended_at).length > 0 ? `
+        <div class="segment-breakdown">
+            <div style="font-size:11px;color:var(--text-dim);font-weight:600;margin-bottom:4px;">${t('تفصيل الأجزاء السابقة', 'Previous Segments')}</div>
+            ${segments.filter(s => s.ended_at).map(s => {
+                const start2 = new Date(s.started_at);
+                const end = new Date(s.ended_at);
+                const mins = Math.round((end - start2) / 60000);
+                const amt = calculateSegmentAmountFromTimes(s.started_at, s.ended_at, s.rate);
+                const modeClass = s.mode === 'single' ? 'seg-mode-single' : 'seg-mode-multi';
+                const modeLabel2 = s.mode === 'single' ? t('Single', 'Single') : t('Multi', 'Multi');
+                const segTimerType = s.timer_type || 'countup';
+                const timerLabel2 = segTimerType === 'countdown' ? '⬇️' : '⬆️';
+                return `<div class="segment-row"><span class="seg-label"><span class="${modeClass}">●</span> ${modeLabel2} ${mins}${t('د', 'min')} ${timerLabel2} @ ${money(s.rate)}</span><span class="seg-value ${modeClass}">${moneyDec(amt)}</span></div>`;
+            }).join('')}
+            <div class="segment-divider"></div>
+            <div class="segment-row"><span class="seg-label">${t('إجمالي Single', 'Single Total')}</span><span class="seg-value seg-mode-single">${moneyDec(totals.singleTotal)}</span></div>
+            <div class="segment-row"><span class="seg-label">${t('إجمالي Multi', 'Multi Total')}</span><span class="seg-value seg-mode-multi">${moneyDec(totals.multiTotal)}</span></div>
+            <div class="segment-row"><span class="seg-label">${t('الطلبات', 'Orders')}</span><span class="seg-value">${moneyDec(totals.ordersTotal)}</span></div>
+            <div class="segment-row segment-total"><span class="seg-label">${t('الإجمالي الكلي', 'Grand Total')}</span><span class="seg-value" style="color:var(--amber);">${moneyDec(totals.grandTotal)}</span></div>
+        </div>
+        ` : ''}
+        
+        <div class="section-title">${t('إضافة طلب', 'Add Order')}</div>
+        <div style="display:flex;flex-wrap:wrap;gap:8px;margin-bottom:12px;" id="menuQuickAdd">
+            ${menuItems.map(m => `<button class="btn btn-ghost btn-sm" onclick="addOrderItem('${session.id}','${m.id}')">${escapeHtml(m.name)} - ${money(m.price)}</button>`).join('') || `<span style="color:var(--text-faint);font-size:13px;">${t('مفيش أصناف — ضيفها من الإعدادات', 'No items — add them from settings')}</span>`}
+        </div>
+        
+        <div class="section-title">${t('الطلبات', 'Orders')}</div>
+        <div class="panel" id="stationOrdersList"></div>
+        
+        <div style="margin-top:16px;display:flex;flex-direction:column;gap:8px;">
+            <button class="btn btn-amber btn-block" onclick="handleSwitchMode('${session.id}','${switchMode}','${st.id}')" id="switchModeBtn">
+                <i class="fa-solid fa-arrows-rotate"></i> ${switchLabel} (${money(switchRate)} ${t('ج/ساعة', 'EGP/hr')})
+            </button>
+            <div style="display:flex;gap:8px;">
+                <button class="btn btn-transfer" style="flex:1;" onclick="openTransferSheet('${stationId}')">
+                    <i class="fa-solid fa-exchange"></i> ${t('نقل الجلسة', 'Transfer Session')}
+                </button>
+                <button class="btn btn-cancel" style="flex:1;" onclick="confirmCancelSession('${stationId}')">
+                    <i class="fa-solid fa-xmark"></i> ${t('إلغاء الجلسة', 'Cancel Session')}
+                </button>
+            </div>
+            <button class="btn btn-ghost" onclick="closeSheet('stationOverlay')">${t('رجوع', 'Back')}</button>
+            <button class="btn btn-teal btn-block" onclick="showEndSessionPayment('${stationId}')"><i class="fa-solid fa-stop"></i> ${t('إنهاء الجلسة', 'End Session')}</button>
+        </div>
+        <div class="error-text" id="stationSheetError"></div>
+    `;
+    renderStationOrdersSection();
+}
+
+// ============================================================
+// SWITCH MODE - UPDATED (No page refresh, smooth transition)
+// ============================================================
+async function handleSwitchMode(sessionId, newMode, stationId) {
+    if (pendingSwitch) return;
+    pendingSwitch = true;
+    const errEl = document.getElementById('stationSheetError');
+    errEl.textContent = '';
+    const btn = document.getElementById('switchModeBtn');
+    if (btn) btn.disabled = true;
+
+    try {
+        const activeSeg = await getActiveSegment(sessionId);
+        if (!activeSeg) {
+            showToast(t('مفيش جزء نشط للتحويل', 'No active segment to switch'), 'error');
+            pendingSwitch = false;
+            if (btn) btn.disabled = false;
+            return;
+        }
+
+        const now = new Date().toISOString();
+        const start = new Date(activeSeg.started_at);
+        let hours = Math.max(0, (new Date(now) - start) / 3600000);
+        let amount = Math.round((hours * Number(activeSeg.rate)) * 100) / 100;
+        let usedSeconds = (new Date(now) - start) / 1000;
+
+        if (activeSeg.timer_type === 'countdown' && activeSeg.duration_seconds) {
+            usedSeconds = Math.min(usedSeconds, activeSeg.duration_seconds);
+            hours = usedSeconds / 3600;
+            amount = Math.round((hours * Number(activeSeg.rate)) * 100) / 100;
+        }
+        
+        await closeSegment(activeSeg.id, now, amount);
+
+        const st = stations.find(s => s.id === stationId);
+        const newRate = newMode === 'single' ? (st.single_rate || 20) : (st.multi_rate || 30);
+        const timerType = activeSeg.timer_type || 'countup';
+        // لو كاونتداون: الجزء الجديد لازم يكمل بالوقت المتبقي فعليًا، مش يرجع للمدة الكاملة من الأول
+        const durationSeconds = timerType === 'countdown'
+            ? Math.max(0, (activeSeg.duration_seconds || 0) - usedSeconds)
+            : (activeSeg.duration_seconds || 0);
+
+        await createSegment(sessionId, newMode, now, newRate, timerType, durationSeconds);
+
+        await supabaseClient.from('sessions')
+            .update({ current_mode: newMode, rate: newRate })
+            .eq('id', sessionId);
+
+        if (sessions[stationId]) {
+            sessions[stationId].current_mode = newMode;
+            sessions[stationId].rate = newRate;
+        }
+
+        showToast(t('تم التحويل إلى ' + (newMode === 'single' ? 'Single' : 'Multi'), 'Switched to ' + (newMode === 'single' ? 'Single' : 'Multi')), 'success');
+        
+        // تحديث الشيت بدون إغلاقه
+        await refreshStationSheetContent(stationId);
+        
+    } catch (e) {
+        console.error('Error switching mode:', e);
+        errEl.textContent = t('فشل التحويل، حاول تاني.', 'Switch failed, try again.');
+        showToast(t('فشل التحويل: ' + e.message, 'Switch failed: ' + e.message), 'error');
+    } finally {
+        pendingSwitch = false;
+        if (btn) btn.disabled = false;
     }
 }
 </script>
