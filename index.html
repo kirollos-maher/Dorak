@@ -453,6 +453,8 @@ button:focus-visible, a:focus-visible, input:focus-visible, select:focus-visible
 </style>
 </head>
 <body>
+<div id="v2SecurityBanner" style="display:none;position:fixed;top:0;left:0;right:0;z-index:1000;background:#3b1f00;color:#ffd8a8;padding:8px 12px;text-align:center;font:600 12px Cairo,sans-serif;">V2: تأكد من تطبيق ملف SQL على Supabase قبل استخدام النظام في الإنتاج.</div>
+
 
 <!-- ============== SETUP SCREEN ============== -->
 <div id="setupScreen" class="screen active">
@@ -798,10 +800,10 @@ button:focus-visible, a:focus-visible, input:focus-visible, select:focus-visible
         <div class="field">
             <label data-ar="التصنيف" data-en="Category">التصنيف</label>
             <select id="menuItemCategory">
-                <option value="مشروبات باردة">🧊 مشروبات باردة</option>
-                <option value="مشروبات ساخنة">☕ مشروبات ساخنة</option>
-                <option value="أكل">🍔 أكل</option>
-                <option value="أخرى">📦 أخرى</option>
+                <option value="cold_drinks">🧊 مشروبات باردة</option>
+                <option value="hot_drinks">☕ مشروبات ساخنة</option>
+                <option value="food">🍔 أكل</option>
+                <option value="other">📦 أخرى</option>
             </select>
         </div>
         <button class="btn btn-amber btn-block" onclick="submitMenuItem()"><span data-ar="حفظ" data-en="Save">حفظ</span></button>
@@ -853,12 +855,32 @@ button:focus-visible, a:focus-visible, input:focus-visible, select:focus-visible
 <div id="printArea" style="display:none;"></div>
 
 <script>
+// V2 NOTE: Browser code is not a security boundary. Production authorization must be enforced by Supabase Auth + RLS.
 // ============================================================
 // CONFIG
 // ============================================================
 const SUPABASE_URL = 'https://hdrvqgicxxgfolozxgjp.supabase.co';
 const SUPABASE_ANON_KEY = 'sb_publishable_dGNw7eTTempKBdFmAZRjYA_eaeEE2jj';
 const supabaseClient = window.supabase.createClient(SUPABASE_URL, SUPABASE_ANON_KEY);
+
+// V2 safety helpers: never report success when Supabase rejected the operation.
+async function dbResult(promise, context = 'Database operation') {
+    const result = await promise;
+    if (result?.error) {
+        console.error(context, result.error);
+        throw result.error;
+    }
+    return result;
+}
+function assertBusinessContext() {
+    if (!business?.id) throw new Error('Business context is missing');
+}
+function assertPositiveNumber(value, label) {
+    const n = Number(value);
+    if (!Number.isFinite(n) || n < 0) throw new Error(`${label} must be a valid non-negative number`);
+    return n;
+}
+
 
 // ============================================================
 // LANGUAGE STATE
@@ -954,6 +976,7 @@ let realtimeChannel = null;
 let tickInterval = null;
 let activeStationId = null;
 let activeSessionOrders = [];
+let currentOrderSessionId = null;
 let selectedPaymentMethod = null;
 let endSessionStationId = null;
 let sessionSegmentsCache = {};
@@ -999,7 +1022,8 @@ function navigateTo(viewId) {
     if (viewId === 'view-settings') { renderSettings(); renderSettingsStations(); renderSettingsPaymentMethods(); }
 }
 function openSheet(id) { document.getElementById(id).classList.add('show'); }
-function closeSheet(id) { 
+function closeSheet(id) {
+    if (id === 'stationOverlay') currentOrderSessionId = null; 
     document.getElementById(id).classList.remove('show'); 
     if (id === 'stationOverlay') {
         activeStationId = null;
@@ -1183,7 +1207,7 @@ async function tryAutoResume() {
         proceedToLock();
     } catch (e) { console.warn('auto-resume failed', e); }
 }
-window.addEventListener('DOMContentLoaded', tryAutoResume);
+window.addEventListener('DOMContentLoaded', () => { tryAutoResume(); });
 
 // ============================================================
 // MAIN APP ENTRY
@@ -1206,23 +1230,52 @@ async function enterMainApp() {
 }
 
 async function loadAllData() {
-    await Promise.all([loadStations(), loadMenuItems(), loadEmployees(), loadPaymentMethods(), loadOrOpenShift()]);
-    renderDashboard(); renderStationsGrid(); renderSettingsStations(); renderSettingsPaymentMethods();
+    // Load each area independently. A problem in one table (for example,
+    // duplicate open shifts in an older database) must not prevent the
+    // stations and the rest of the app from rendering.
+    const results = await Promise.allSettled([
+        loadStations(),
+        loadMenuItems(),
+        loadEmployees(),
+        loadPaymentMethods(),
+        loadOrOpenShift()
+    ]);
+
+    results.forEach((result, index) => {
+        if (result.status === 'rejected') {
+            const names = ['stations', 'menu_items', 'employees', 'payment_methods', 'shift'];
+            console.error(`Failed to load ${names[index]}:`, result.reason);
+        }
+    });
+
+    renderDashboard();
+    renderStationsGrid();
+    renderSettingsStations();
+    renderSettingsPaymentMethods();
 }
 
 async function loadStations() {
-    let { data } = await supabaseClient.from('stations').select('*').eq('business_id', business.id).order('number');
-    if (!data || data.length === 0) {
-        const seed = Array.from({ length: business.total_stations || 4 }, (_, i) => ({ 
-            business_id: business.id, number: i + 1, single_rate: 20, multi_rate: 30, name: `جهاز ${i + 1}` 
-        }));
-        const { data: created } = await supabaseClient.from('stations').insert(seed).select();
-        data = created || [];
+    assertBusinessContext();
+    const { data, error } = await supabaseClient.from('stations').select('*').eq('business_id', business.id).order('number');
+    if (error) {
+        console.error('Error loading stations:', error);
+        throw error;
     }
-    stations = data;
-    const { data: activeSessions } = await supabaseClient.from('sessions').select('*').eq('business_id', business.id).eq('status', 'active');
+    if (Array.isArray(data) && data.length === 0) {
+        const seed = Array.from({ length: business.total_stations || 4 }, (_, i) => ({ 
+            business_id: business.id, number: i + 1, single_rate: 20, multi_rate: 30, name: `جهاز ${i + 1}`
+        }));
+        const createdResult = await dbResult(supabaseClient.from('stations').insert(seed).select(), 'Seeding stations');
+        stations = createdResult.data || [];
+    } else {
+        stations = data || [];
+    }
+    const activeResult = await dbResult(
+        supabaseClient.from('sessions').select('*').eq('business_id', business.id).eq('status', 'active'),
+        'Loading active sessions'
+    );
     sessions = {};
-    (activeSessions || []).forEach(s => { sessions[s.station_id] = s; });
+    (activeResult.data || []).forEach(s => { sessions[s.station_id] = s; });
 }
 
 // ============================================================
@@ -1257,64 +1310,31 @@ async function loadMenuItems() {
 }
 
 async function saveMenuItemToDB(item) {
-    try {
-        const { data, error } = await supabaseClient.from('menu_items').insert(item).select().single();
-        if (error) {
-            console.error('Error saving menu item to DB:', error);
-            const localItems = JSON.parse(localStorage.getItem('psr_menu_items_' + business.id) || '[]');
-            const newItem = { ...item, id: 'local_' + Date.now(), created_at: new Date().toISOString() };
-            localItems.push(newItem);
-            localStorage.setItem('psr_menu_items_' + business.id, JSON.stringify(localItems));
-            return newItem;
-        }
-        return data;
-    } catch (e) {
-        console.error('Error in saveMenuItemToDB:', e);
-        const localItems = JSON.parse(localStorage.getItem('psr_menu_items_' + business.id) || '[]');
-        const newItem = { ...item, id: 'local_' + Date.now(), created_at: new Date().toISOString() };
-        localItems.push(newItem);
-        localStorage.setItem('psr_menu_items_' + business.id, JSON.stringify(localItems));
-        return newItem;
+    assertBusinessContext();
+    const { data, error } = await supabaseClient.from('menu_items').insert(item).select().single();
+    if (error) {
+        console.error('Error saving menu item to DB:', error);
+        throw error;
     }
+    return data;
 }
 
 async function updateMenuItemInDB(id, updates) {
-    try {
-        const { data, error } = await supabaseClient.from('menu_items').update(updates).eq('id', id).select().single();
-        if (error) {
-            console.error('Error updating menu item in DB:', error);
-            const localItems = JSON.parse(localStorage.getItem('psr_menu_items_' + business.id) || '[]');
-            const index = localItems.findIndex(item => item.id === id);
-            if (index !== -1) {
-                localItems[index] = { ...localItems[index], ...updates };
-                localStorage.setItem('psr_menu_items_' + business.id, JSON.stringify(localItems));
-            }
-            return localItems.find(item => item.id === id) || null;
-        }
-        return data;
-    } catch (e) {
-        console.error('Error in updateMenuItemInDB:', e);
-        return null;
+    const { data, error } = await supabaseClient.from('menu_items').update(updates).eq('id', id).eq('business_id', business.id).select().single();
+    if (error) {
+        console.error('Error updating menu item in DB:', error);
+        throw error;
     }
+    return data;
 }
 
 async function deleteMenuItemFromDB(id) {
-    try {
-        const { error } = await supabaseClient.from('menu_items').delete().eq('id', id);
-        if (error) {
-            console.error('Error deleting menu item from DB:', error);
-        }
-        let localItems = JSON.parse(localStorage.getItem('psr_menu_items_' + business.id) || '[]');
-        localItems = localItems.filter(item => item.id !== id);
-        localStorage.setItem('psr_menu_items_' + business.id, JSON.stringify(localItems));
-        return true;
-    } catch (e) {
-        console.error('Error in deleteMenuItemFromDB:', e);
-        let localItems = JSON.parse(localStorage.getItem('psr_menu_items_' + business.id) || '[]');
-        localItems = localItems.filter(item => item.id !== id);
-        localStorage.setItem('psr_menu_items_' + business.id, JSON.stringify(localItems));
-        return true;
+    const { error } = await supabaseClient.from('menu_items').delete().eq('id', id).eq('business_id', business.id);
+    if (error) {
+        console.error('Error deleting menu item from DB:', error);
+        throw error;
     }
+    return true;
 }
 
 async function loadEmployees() {
@@ -1359,12 +1379,43 @@ async function loadPaymentMethods() {
 }
 
 async function loadOrOpenShift() {
-    let { data } = await supabaseClient.from('shifts').select('*').eq('business_id', business.id).eq('status', 'open').maybeSingle();
-    if (!data) {
-        const { data: created } = await supabaseClient.from('shifts').insert({ business_id: business.id }).select().single();
-        data = created;
+    assertBusinessContext();
+
+    // Do not use maybeSingle() here. The current database contains multiple
+    // open shifts for this business (the console reports 19 rows), so
+    // maybeSingle() throws PGRST116 and used to stop the whole app from rendering.
+    const { data: openShifts, error } = await supabaseClient
+        .from('shifts')
+        .select('*')
+        .eq('business_id', business.id)
+        .eq('status', 'open')
+        .order('opened_at', { ascending: false });
+
+    if (error) throw error;
+
+    if (openShifts && openShifts.length > 0) {
+        // Use the newest open shift for now. Do NOT automatically delete or
+        // close the other financial records; they need manual review.
+        currentShift = openShifts[0];
+
+        if (openShifts.length > 1) {
+            console.warn(
+                `PS Rental: ${openShifts.length} open shifts found for business ${business.id}. ` +
+                'Using the newest one. Review duplicate open shifts in Supabase.'
+            );
+        }
+        return;
     }
-    currentShift = data;
+
+    const createdResult = await dbResult(
+        supabaseClient
+            .from('shifts')
+            .insert({ business_id: business.id, opened_at: new Date().toISOString(), status: 'open' })
+            .select()
+            .single(),
+        'Opening shift'
+    );
+    currentShift = createdResult.data;
 }
 
 // ============================================================
@@ -1405,9 +1456,9 @@ async function createSegment(sessionId, mode, startedAt, rate, timerType, durati
         business_id: business.id,
         mode: mode,
         started_at: startedAt,
-        rate: rate,
+        rate: assertPositiveNumber(rate, 'Rate'),
         timer_type: timerType || 'countup',
-        duration_seconds: Math.round(durationSeconds) || 0
+        duration_seconds: Math.max(0, Math.round(Number(durationSeconds) || 0))
     }).select().single();
     if (error) throw error;
     sessionSegmentsCache[sessionId] = null;
@@ -1568,9 +1619,9 @@ function subscribeRealtime() {
     if (realtimeChannel) supabaseClient.removeChannel(realtimeChannel);
     realtimeChannel = supabaseClient.channel('biz-' + business.id)
         .on('postgres_changes', { event: '*', schema: 'public', table: 'sessions', filter: 'business_id=eq.' + business.id }, handleSessionChange)
-        .on('postgres_changes', { event: '*', schema: 'public', table: 'session_orders' }, handleOrderChange)
+        .on('postgres_changes', { event: '*', schema: 'public', table: 'session_orders', filter: 'business_id=eq.' + business.id }, handleOrderChange)
         .on('postgres_changes', { event: '*', schema: 'public', table: 'stations', filter: 'business_id=eq.' + business.id }, handleStationChange)
-        .on('postgres_changes', { event: '*', schema: 'public', table: 'session_segments' }, handleSegmentChange)
+        .on('postgres_changes', { event: '*', schema: 'public', table: 'session_segments', filter: 'business_id=eq.' + business.id }, handleSegmentChange)
         .subscribe();
 }
 
@@ -1987,10 +2038,12 @@ async function submitStationManagement() {
 
     try {
         if (id) {
-            await supabaseClient.from('stations').update({ number, name, single_rate: singleRate, multi_rate: multiRate }).eq('id', id);
+            const { error } = await supabaseClient.from('stations').update({ number, name, single_rate: singleRate, multi_rate: multiRate }).eq('id', id).eq('business_id', business.id);
+            if (error) throw error;
             showToast(t('تم تحديث الجهاز', 'Device updated'), 'success');
         } else {
-            await supabaseClient.from('stations').insert({ business_id: business.id, number, name, single_rate: singleRate, multi_rate: multiRate });
+            const { error } = await supabaseClient.from('stations').insert({ business_id: business.id, number, name, single_rate: singleRate, multi_rate: multiRate });
+            if (error) throw error;
             showToast(t('تم إضافة الجهاز', 'Device added'), 'success');
         }
         closeSheet('stationManagementOverlay');
@@ -2013,7 +2066,8 @@ async function deleteStationById(stationId) {
     }
 
     try {
-        await supabaseClient.from('stations').delete().eq('id', stationId);
+        const { error } = await supabaseClient.from('stations').delete().eq('id', stationId).eq('business_id', business.id);
+        if (error) throw error;
         showToast(t('تم حذف الجهاز', 'Device deleted'), 'success');
         await loadStations();
         renderStationsGrid();
@@ -2139,43 +2193,144 @@ async function deletePaymentMethod() {
 // ORDER FUNCTIONS
 // ============================================================
 async function addOrderItem(sessionId, menuItemId) {
-    const item = menuItems.find(m => m.id === menuItemId);
+    const item = menuItems.find(m => String(m.id) === String(menuItemId));
     if (!item) {
         showToast(t('الصنف غير موجود', 'Item not found'), 'error');
         return;
     }
-    
+
+    sessionId = sessionId ||
+        currentOrderSessionId ||
+        (activeStationId && sessions[activeStationId] ? sessions[activeStationId].id : '');
+
+    if (!sessionId) {
+        console.error('No active session ID', {
+            activeStationId,
+            currentOrderSessionId,
+            stationSession: activeStationId ? sessions[activeStationId] : null
+        });
+        showToast(t('الجلسة غير موجودة', 'Session not found'), 'error');
+        return;
+    }
+
     try {
-        const existing = activeSessionOrders.find(o => o.menu_item_id === menuItemId);
-        
+        const existing = activeSessionOrders.find(
+            o => String(o.menu_item_id) === String(menuItemId)
+        );
+
         if (existing) {
-            const { error } = await supabaseClient.from('session_orders')
-                .update({ quantity: existing.quantity + 1 })
+            const { error } = await supabaseClient
+                .from('session_orders')
+                .update({ quantity: Number(existing.quantity || 0) + 1 })
                 .eq('id', existing.id);
+
             if (error) throw error;
-            existing.quantity += 1;
         } else {
-            const { data, error } = await supabaseClient.from('session_orders').insert({
+            // IMPORTANT:
+            // Do NOT use .select().single() here.
+            // If INSERT is allowed by RLS but SELECT is not,
+            // .insert().select().single() reports a false failure.
+            //
+            // We also send business_id when the column exists in the
+            // current V2 schema. If an older database does not have it,
+            // retry once without business_id.
+            let insertPayload = {
+                business_id: business.id,
                 session_id: sessionId,
                 menu_item_id: item.id,
                 item_name: item.name,
-                unit_price: item.price,
+                unit_price: Number(item.price),
                 quantity: 1
-            }).select().single();
+            };
+
+            let { error } = await supabaseClient
+                .from('session_orders')
+                .insert(insertPayload);
+
+            if (error && (
+                error.code === '42703' ||
+                /business_id/i.test(error.message || '') &&
+                /column/i.test(error.message || '')
+            )) {
+                delete insertPayload.business_id;
+
+                ({ error } = await supabaseClient
+                    .from('session_orders')
+                    .insert(insertPayload));
+            }
+
             if (error) throw error;
-            if (data) activeSessionOrders.push(data);
         }
-        
+
+        // Reload from DB so the UI has the real row/id.
+        const { data: refreshedOrders, error: reloadError } = await supabaseClient
+            .from('session_orders')
+            .select('*')
+            .eq('session_id', sessionId)
+            .order('created_at');
+
+        if (reloadError) {
+            // The insert succeeded, but the current RLS SELECT policy
+            // may prevent reading the row back. Do not claim INSERT failed.
+            console.error('Order was inserted, but reload failed:', reloadError);
+            showToast(
+                t('تم حفظ الطلب، لكن صلاحية قراءة الطلبات تحتاج مراجعة في Supabase.', 'Order was saved, but the SELECT permission for orders needs review in Supabase.'),
+                'warning'
+            );
+        } else {
+            activeSessionOrders = refreshedOrders || [];
+        }
+
         renderStationOrdersSection();
+
         const totals = await calculateTotalAmounts(sessionId);
         const totalEl = document.getElementById('overallTotalAmount');
         if (totalEl) {
             totalEl.textContent = moneyDec(totals.grandTotal);
         }
-        showToast(t('تم إضافة الطلب', 'Order added'), 'success');
+
+        if (!reloadError) {
+            showToast(t('تم إضافة الطلب', 'Order added'), 'success');
+        }
+
     } catch (e) {
         console.error('Error adding order:', e);
-        showToast(t('فشل إضافة الطلب', 'Failed to add order'), 'error');
+
+        const code = e?.code || '';
+        const message = e?.message || String(e);
+
+        let userMessage = t('فشل إضافة الطلب', 'Failed to add order');
+
+        if (code === '23503') {
+            userMessage = t(
+                'فشل الطلب: الصنف أو الجلسة غير موجودة في قاعدة البيانات.',
+                'Order failed: the item or session does not exist in the database.'
+            );
+        } else if (code === '42501') {
+            userMessage = t(
+                'فشل الطلب: صلاحيات قاعدة البيانات (RLS) تمنع إضافة الطلب.',
+                'Order failed: database permissions (RLS) are blocking the insert.'
+            );
+        } else if (code === '23502') {
+            userMessage = t(
+                'فشل الطلب: يوجد عمود مطلوب في session_orders لم يتم إرساله.',
+                'Order failed: a required column in session_orders was not provided.'
+            );
+        } else if (code === '23514') {
+            userMessage = t(
+                'فشل الطلب: يوجد شرط CHECK في جدول session_orders يمنع هذه القيمة.',
+                'Order failed: a CHECK constraint in session_orders rejected the value.'
+            );
+        }
+
+        console.error('Supabase order error details:', {
+            code,
+            message,
+            details: e?.details,
+            hint: e?.hint
+        });
+
+        showToast(userMessage, 'error');
     }
 }
 
@@ -2290,21 +2445,17 @@ async function confirmTransfer() {
     if (!confirm(confirmMsg)) return;
     
     try {
+        const currentMode = sourceSession.current_mode || 'single';
+        const currentRate = Number(sourceSession.rate) || (currentMode === 'multi' ? Number(targetStation.multi_rate) : Number(targetStation.single_rate));
         const { error: updateError } = await supabaseClient.from('sessions')
-            .update({ 
-                station_id: targetStationId,
-                rate: targetStation.single_rate || 20
-            })
-            .eq('id', sourceSession.id);
-        
+            .update({ station_id: targetStationId, rate: currentRate })
+            .eq('id', sourceSession.id)
+            .eq('business_id', business.id)
+            .eq('status', 'active');
         if (updateError) throw updateError;
-        
+
         delete sessions[sourceStationId];
-        sessions[targetStationId] = {
-            ...sourceSession,
-            station_id: targetStationId,
-            rate: targetStation.single_rate || 20
-        };
+        sessions[targetStationId] = { ...sourceSession, station_id: targetStationId, rate: currentRate };
         
         closeSheet('transferOverlay');
         closeSheet('stationOverlay');
@@ -2448,6 +2599,7 @@ async function openStationSheet(stationId) {
     body.innerHTML = '';
 
     if (!session) {
+        currentOrderSessionId = null;
         const singleRate = st.single_rate || 20;
         const multiRate = st.multi_rate || 30;
         body.innerHTML = `
@@ -2511,6 +2663,8 @@ async function openStationSheet(stationId) {
         openSheet('stationOverlay');
         return;
     }
+
+    currentOrderSessionId = session.id;
 
     const segments = await getSessionSegments(session.id);
     const activeSeg = segments.find(s => !s.ended_at);
@@ -2619,6 +2773,36 @@ async function openStationSheet(stationId) {
     openSheet('stationOverlay');
 }
 
+function normalizeMenuCategory(category) {
+    const value = String(category || '').trim().toLowerCase();
+    const map = {
+        'مشروبات باردة': 'cold_drinks',
+        'cold drinks': 'cold_drinks',
+        'cold_drinks': 'cold_drinks',
+        'مشروبات ساخنة': 'hot_drinks',
+        'hot drinks': 'hot_drinks',
+        'hot_drinks': 'hot_drinks',
+        'أكل': 'food',
+        'اكل': 'food',
+        'food': 'food',
+        'أخرى': 'other',
+        'اخري': 'other',
+        'other': 'other'
+    };
+    return map[value] || 'other';
+}
+
+function menuCategoryLabel(category) {
+    const key = normalizeMenuCategory(category);
+    const labels = {
+        cold_drinks: t('🧊 مشروبات باردة', '🧊 Cold Drinks'),
+        hot_drinks: t('☕ مشروبات ساخنة', '☕ Hot Drinks'),
+        food: t('🍔 أكل', '🍔 Food'),
+        other: t('📦 أخرى', '📦 Other')
+    };
+    return labels[key];
+}
+
 function renderMenuQuickAdd() {
     const container = document.getElementById('menuQuickAdd');
     if (!container) return;
@@ -2631,7 +2815,7 @@ function renderMenuQuickAdd() {
     // تجميع الأصناف حسب التصنيف
     const grouped = {};
     menuItems.forEach(item => {
-        const category = item.category || t('أخرى', 'Other');
+        const category = normalizeMenuCategory(item.category);
         if (!grouped[category]) grouped[category] = [];
         grouped[category].push(item);
     });
@@ -2653,12 +2837,15 @@ function renderMenuQuickAdd() {
         
         html += `<div class="menu-category-group">`;
         html += `<div class="menu-category-toggle" onclick="toggleCategory('${escapeHtml(category)}')">`;
-        html += `<span class="cat-title">${escapeHtml(category)}</span>`;
+        html += `<span class="cat-title">${escapeHtml(menuCategoryLabel(category))}</span>`;
         html += `<i class="fa-solid fa-chevron-down cat-arrow ${open ? 'open' : ''}"></i>`;
         html += `</div>`;
         html += `<div class="menu-category-items ${open ? 'open' : ''}" data-category="${escapeHtml(category)}">`;
         items.forEach(item => {
-            const sessionId = activeSessionOrders.length > 0 ? activeSessionOrders[0].session_id : '';
+            const sessionId =
+                currentOrderSessionId ||
+                (activeStationId && sessions[activeStationId] ? sessions[activeStationId].id : '') ||
+                (activeSessionOrders.length > 0 ? activeSessionOrders[0].session_id : '');
             html += `<button class="btn btn-ghost btn-sm" onclick="addOrderItem('${sessionId}','${item.id}')">${escapeHtml(item.name)} - ${money(item.price)}</button>`;
         });
         html += `</div></div>`;
@@ -2678,7 +2865,7 @@ function toggleCategory(category) {
     const toggles = container.querySelectorAll('.menu-category-toggle');
     toggles.forEach(toggle => {
         const titleEl = toggle.querySelector('.cat-title');
-        if (titleEl && titleEl.textContent.trim() === category) {
+        if (titleEl && titleEl.textContent.trim() === menuCategoryLabel(category)) {
             const arrow = toggle.querySelector('.cat-arrow');
             if (arrow) {
                 arrow.classList.toggle('open', isOpen);
@@ -3143,12 +3330,21 @@ function openExpenseSheet() { document.getElementById('expenseDesc').value = '';
 async function submitExpense() {
     const description = document.getElementById('expenseDesc').value.trim();
     const amount = parseFloat(document.getElementById('expenseAmount').value);
-    if (!description || !amount) { document.getElementById('expenseError').textContent = t('اكمل البيانات.', 'Complete the data.'); return; }
-    await supabaseClient.from('expenses').insert({ business_id: business.id, shift_id: currentShift.id, description, amount });
-    closeSheet('expenseOverlay');
-    showToast(t('تم تسجيل المصروف', 'Expense recorded'), 'success');
-    renderDashboard();
-    if (document.getElementById('view-shift').classList.contains('active')) renderShiftView();
+    const errEl = document.getElementById('expenseError');
+    errEl.textContent = '';
+    if (!description || !Number.isFinite(amount) || amount <= 0) { errEl.textContent = t('اكتب وصف ومبلغ صحيح.', 'Enter a valid description and amount.'); return; }
+    if (!currentShift?.id) { errEl.textContent = t('مفيش شيفت مفتوح.', 'No open shift.'); return; }
+    try {
+        const { error } = await supabaseClient.from('expenses').insert({ business_id: business.id, shift_id: currentShift.id, description, amount });
+        if (error) throw error;
+        closeSheet('expenseOverlay');
+        showToast(t('تم تسجيل المصروف', 'Expense recorded'), 'success');
+        renderDashboard();
+        if (document.getElementById('view-shift').classList.contains('active')) renderShiftView();
+    } catch (e) {
+        console.error('Error saving expense:', e);
+        errEl.textContent = t('فشل تسجيل المصروف.', 'Failed to save expense.');
+    }
 }
 
 // ============================================================
@@ -3485,7 +3681,7 @@ function renderSettings() {
     // تجميع الأصناف حسب التصنيف لعرضها في الإعدادات
     const groupedMenu = {};
     menuItems.forEach(item => {
-        const category = item.category || t('أخرى', 'Other');
+        const category = normalizeMenuCategory(item.category);
         if (!groupedMenu[category]) groupedMenu[category] = [];
         groupedMenu[category].push(item);
     });
@@ -3496,10 +3692,10 @@ function renderSettings() {
     } else {
         for (const [category, items] of Object.entries(groupedMenu)) {
             menuHtml += `<div class="menu-category-group">`;
-            menuHtml += `<div class="menu-category-title" style="color:var(--teal);">${escapeHtml(category)}</div>`;
+            menuHtml += `<div class="menu-category-title" style="color:var(--teal);">${escapeHtml(menuCategoryLabel(category))}</div>`;
             items.forEach(m => {
                 menuHtml += `<div class="list-row">
-                    <div><div class="row-title">${escapeHtml(m.name)}</div><div class="row-sub">${escapeHtml(m.category || t('أخرى', 'Other'))}</div></div>
+                    <div><div class="row-title">${escapeHtml(m.name)}</div><div class="row-sub">${escapeHtml(menuCategoryLabel(m.category))}</div></div>
                     <div class="row-actions">
                         <div class="row-value mono" style="margin-left:12px;">${money(m.price)}</div>
                         <button class="btn btn-ghost btn-sm" onclick="editMenuItem('${m.id}')"><i class="fa-solid fa-pen"></i></button>
@@ -3530,7 +3726,7 @@ function openMenuItemSheet() {
     document.getElementById('menuItemId').value = '';
     document.getElementById('menuItemName').value = '';
     document.getElementById('menuItemPrice').value = '';
-    document.getElementById('menuItemCategory').value = 'مشروبات باردة';
+    document.getElementById('menuItemCategory').value = 'cold_drinks';
     document.getElementById('menuDeleteBtn').style.display = 'none';
     document.getElementById('menuItemError').textContent = '';
     document.getElementById('menuItemSheetTitle').textContent = t('إضافة صنف للقائمة', 'Add Menu Item');
@@ -3543,7 +3739,7 @@ function editMenuItem(itemId) {
     document.getElementById('menuItemId').value = item.id;
     document.getElementById('menuItemName').value = item.name;
     document.getElementById('menuItemPrice').value = item.price;
-    document.getElementById('menuItemCategory').value = item.category || 'مشروبات باردة';
+    document.getElementById('menuItemCategory').value = normalizeMenuCategory(item.category);
     document.getElementById('menuDeleteBtn').style.display = 'flex';
     document.getElementById('menuItemError').textContent = '';
     document.getElementById('menuItemSheetTitle').textContent = t('تعديل صنف', 'Edit Item');
@@ -3554,7 +3750,7 @@ async function submitMenuItem() {
     const id = document.getElementById('menuItemId').value;
     const name = document.getElementById('menuItemName').value.trim();
     const price = parseFloat(document.getElementById('menuItemPrice').value);
-    const category = document.getElementById('menuItemCategory').value.trim() || t('أخرى', 'Other');
+    const category = normalizeMenuCategory(document.getElementById('menuItemCategory').value);
     const errEl = document.getElementById('menuItemError');
     errEl.textContent = '';
     
@@ -3603,7 +3799,7 @@ async function submitMenuItem() {
         console.error('Error in submitMenuItem:', e);
         let errorMsg = e.message || 'Unknown error';
         if (errorMsg.includes('check constraint') || errorMsg.includes('menu_items_category_check')) {
-            errorMsg = 'مشكلة في قاعدة البيانات: عمود التصنيف لا يقبل هذه القيمة. جرب تصنيف آخر أو استخدم localStorage.';
+            errorMsg = 'مشكلة في قاعدة البيانات: عمود التصنيف لا يقبل هذه القيمة. شغّل ملف SQL الخاص بـ V2 على Supabase ثم جرّب مرة أخرى.';
         }
         errEl.textContent = t('حصل خطأ: ' + errorMsg, 'Error: ' + errorMsg);
         showToast(t('فشل حفظ الصنف: ' + errorMsg, 'Failed to save item: ' + errorMsg), 'error');
@@ -3667,7 +3863,8 @@ async function submitEmployee() {
 async function deleteEmployee(employeeId) {
     if (!confirm(t('هل أنت متأكد من حذف هذا الموظف؟', 'Are you sure you want to delete this employee?'))) return;
     try {
-        await supabaseClient.from('employees').delete().eq('id', employeeId);
+        const { error } = await supabaseClient.from('employees').delete().eq('id', employeeId).eq('business_id', business.id);
+        if (error) throw error;
         showToast(t('تم حذف الموظف', 'Employee deleted'), 'success');
         await loadEmployees();
         renderSettings();
