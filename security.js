@@ -5,28 +5,20 @@
 (function() {
     'use strict';
 
-    // --------------------- DOMAIN LOCK ---------------------
+    // --------------------- DOMAIN LOCK (معطل) ---------------------
+    // خلينا نعطل القفل عشان العميل يشتغل على أي نطاق أو IP
+    /*
     const ALLOWED_DOMAINS = [
         'yourdomain.com',
         'www.yourdomain.com',
-        // أضف هنا النطاقات المسموح بها (بدون http://)
     ];
-
     const currentDomain = window.location.hostname;
     const isAllowed = ALLOWED_DOMAINS.some(d => currentDomain === d || currentDomain.endsWith('.' + d));
-
     if (!isAllowed && ALLOWED_DOMAINS.length > 0) {
-        document.body.innerHTML = `
-            <div style="display:flex;align-items:center;justify-content:center;height:100vh;background:#0c0f12;color:#eef1f4;font-family:sans-serif;text-align:center;padding:20px;">
-                <div>
-                    <h1 style="font-size:28px;margin-bottom:10px;">⛔ غير مصرح بهذا النطاق</h1>
-                    <p style="color:#8b95a1;">هذا التطبيق يعمل فقط على النطاقات المصرح بها رسمياً.</p>
-                    <p style="color:#565f6a;font-size:13px;margin-top:20px;">يرجى الاتصال بالدعم الفني.</p>
-                </div>
-            </div>
-        `;
-        throw new Error('Unauthorized domain: ' + currentDomain);
+        document.body.innerHTML = `...`;
+        throw new Error('Unauthorized domain');
     }
+    */
 
     // ---------------- ANTI-DEBUGGING (خفيف) ----------------
     // يكشف فتح أدوات المطور عبر console.log مع toString معطل
