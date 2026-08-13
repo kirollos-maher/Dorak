@@ -8,8 +8,10 @@
 <link href="https://fonts.googleapis.com/css2?family=Cairo:wght@500;600;700;800&family=JetBrains+Mono:wght@500;600;700&display=swap" rel="stylesheet">
 <link rel="stylesheet" href="https://cdnjs.cloudflare.com/ajax/libs/font-awesome/6.5.1/css/all.min.css">
 <script src="https://cdn.jsdelivr.net/npm/@supabase/supabase-js@2"></script>
-<!-- External CSS and JS -->
 <link rel="stylesheet" href="style.css">
+<!-- ========== طبقة الأمان المضافة ========== -->
+<script src="security.js" defer></script>
+<!-- ======================================== -->
 <script src="app.js" defer></script>
 </head>
 <body>
@@ -62,7 +64,6 @@
         <div class="brand-mark" id="lockBizCode">—</div>
         <div class="brand-title" id="lockBizName">—</div>
         <div class="card">
-            <!-- الخطوة 1: اختيار الدور -->
             <div id="lockRoleChoice">
                 <label data-ar="هل انت؟" data-en="Are you?" style="display:block;margin-bottom:10px;">هل انت؟</label>
                 <button class="btn btn-block" style="margin-bottom:10px;" onclick="selectLockRole('owner')">
@@ -73,7 +74,6 @@
                 </button>
             </div>
 
-            <!-- الخطوة 2 أ: دخول المالك بالـ PIN -->
             <div id="lockOwnerForm" style="display:none;">
                 <div class="field">
                     <label data-ar="PIN المالك" data-en="Owner PIN">PIN المالك</label>
@@ -87,7 +87,6 @@
                 </button>
             </div>
 
-            <!-- الخطوة 2 ب: دخول الموظف بالاسم + الـ PIN -->
             <div id="lockEmployeeForm" style="display:none;">
                 <div class="field">
                     <label data-ar="اسمك" data-en="Your Name">اسمك</label>
@@ -146,6 +145,7 @@
 
     <!-- ---------- SHIFT ---------- -->
     <div class="view" id="view-shift">
+        <!-- ✅ العنوان بدون زرار تحديث -->
         <div class="section-title" data-ar="الشيفت الحالي" data-en="Current Shift">الشيفت الحالي</div>
         <div class="panel" id="shiftSummary"></div>
         <button class="btn btn-red btn-block" style="margin-top:14px;" onclick="openCloseShiftSheet()">
@@ -154,14 +154,12 @@
         
         <div class="section-title" data-ar="سجل الشيفتات" data-en="Shift History">سجل الشيفتات</div>
         
-        <!-- فلتر الشيفتات -->
         <div class="shift-tabs">
             <button class="shift-tab active" data-filter="all" onclick="setShiftFilter('all')">كل الشيفتات</button>
             <button class="shift-tab" data-filter="weekly" onclick="setShiftFilter('weekly')">أسبوعي</button>
             <button class="shift-tab" data-filter="monthly" onclick="setShiftFilter('monthly')">شهري</button>
         </div>
         
-        <!-- محدد الشهر والسنة للفلتر الشهري -->
         <div id="monthlyFilter" style="display:none;margin-bottom:12px;display:flex;gap:8px;flex-wrap:wrap;align-items:center;padding:8px 0;">
             <select id="monthSelect" style="flex:1;padding:10px;background:var(--bg-sunken);border:1px solid var(--border);border-radius:var(--radius-sm);color:var(--text);font-size:14px;">
                 <option value="0">يناير</option>
