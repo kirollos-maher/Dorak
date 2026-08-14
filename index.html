@@ -1,420 +1,257 @@
-<!DOCTYPE html>
-<html lang="ar" dir="rtl">
-<head>
-<meta charset="UTF-8">
-<meta name="viewport" content="width=device-width, initial-scale=1.0, maximum-scale=1, user-scalable=no">
-<title>PS Rental Pro</title>
-<link rel="preconnect" href="https://fonts.googleapis.com">
-<link href="https://fonts.googleapis.com/css2?family=Cairo:wght@500;600;700;800&family=JetBrains+Mono:wght@500;600;700&display=swap" rel="stylesheet">
-<link rel="stylesheet" href="https://cdnjs.cloudflare.com/ajax/libs/font-awesome/6.5.1/css/all.min.css">
-<script src="https://cdn.jsdelivr.net/npm/@supabase/supabase-js@2"></script>
-<link rel="stylesheet" href="style.css">
-<script src="app.js" defer></script>
-</head>
-<body>
-<div id="v2SecurityBanner" style="display:none;position:fixed;top:0;left:0;right:0;z-index:1000;background:#3b1f00;color:#ffd8a8;padding:8px 12px;text-align:center;font:600 12px Cairo,sans-serif;">V2: تأكد من تطبيق ملف SQL على Supabase قبل استخدام النظام في الإنتاج.</div>
+// ============================================================
+// COUNTDOWN ALERTS - نظام التنبيهات المتقدم (نسخة Plate Pro)
+// ============================================================
 
+// تخزين حالة التنبيهات لكل جهاز
+const countdownAlertState = {};
 
-<!-- ============== SETUP SCREEN ============== -->
-<div id="setupScreen" class="screen active">
-    <div class="centered-screen">
-        <div class="brand-mark">PS RENTAL PRO</div>
-        <div class="brand-title" data-ar="تسجيل الدخول للنشاط" data-en="Business Login">تسجيل الدخول للنشاط</div>
-        <div class="card">
-            <div class="field">
-                <label data-ar="كود النشاط التجاري" data-en="Business Code">كود النشاط التجاري</label>
-                <input type="text" id="setupBusinessCode" class="mono" placeholder="مثال: CAFE01" style="text-transform:uppercase">
-            </div>
-            <button class="btn btn-amber btn-block" id="setupContinueBtn" onclick="handleSetupContinue()">
-                <i class="fa-solid fa-arrow-left"></i> <span data-ar="متابعة" data-en="Continue">متابعة</span>
-            </button>
-            <div class="error-text" id="setupError"></div>
-        </div>
-    </div>
-</div>
+// الحد الأدنى للتنبيه (بالثواني) - 300 ثانية = 5 دقائق
+const ALERT_THRESHOLD = 300;
 
-<!-- ============== ACTIVATION SCREEN ============== -->
-<div id="activationScreen" class="screen">
-    <div class="centered-screen">
-        <div class="brand-mark">تفعيل الجهاز</div>
-        <div class="brand-title" id="activationBizName">—</div>
-        <div class="card">
-            <p style="color:var(--text-dim);font-size:13px;margin-bottom:16px;" data-ar="الجهاز ده لسه مش مفعّل على النشاط ده. أدخل كود التفعيل اللي معاك." data-en="This device is not activated for this business. Enter the activation code you have.">
-                الجهاز ده لسه مش مفعّل على النشاط ده. أدخل كود التفعيل اللي معاك.
-            </p>
-            <div class="field">
-                <label data-ar="كود التفعيل" data-en="Activation Code">كود التفعيل</label>
-                <input type="text" id="activationCodeInput" class="mono" placeholder="XXXX-XXXX" style="text-transform:uppercase">
-            </div>
-            <button class="btn btn-amber btn-block" onclick="handleActivateDevice()">
-                <i class="fa-solid fa-check"></i> <span data-ar="تفعيل" data-en="Activate">تفعيل</span>
-            </button>
-            <button class="btn btn-ghost btn-block" style="margin-top:8px;" onclick="showScreen('setupScreen')"><span data-ar="رجوع" data-en="Back">رجوع</span></button>
-            <div class="error-text" id="activationError"></div>
-        </div>
-    </div>
-</div>
+// متغير للمؤقت
+let countdownAlertInterval = null;
 
-<!-- ============== LOCK SCREEN ============== -->
-<div id="lockScreen" class="screen">
-    <div class="centered-screen">
-        <div class="brand-mark" id="lockBizCode">—</div>
-        <div class="brand-title" id="lockBizName">—</div>
-        <div class="card">
-            <div id="lockRoleChoice">
-                <label data-ar="هل انت؟" data-en="Are you?" style="display:block;margin-bottom:10px;">هل انت؟</label>
-                <button class="btn btn-block" style="margin-bottom:10px;" onclick="selectLockRole('owner')">
-                    <i class="fa-solid fa-user-shield"></i> <span data-ar="المالك / الأدمن" data-en="Owner / Admin">المالك / الأدمن</span>
-                </button>
-                <button class="btn btn-block" onclick="selectLockRole('employee')">
-                    <i class="fa-solid fa-user"></i> <span data-ar="موظف" data-en="Employee">موظف</span>
-                </button>
-            </div>
+// متغيرات الصوت
+let audioContext = null;
+let ringTimeout = null;
 
-            <div id="lockOwnerForm" style="display:none;">
-                <div class="field">
-                    <label data-ar="PIN المالك" data-en="Owner PIN">PIN المالك</label>
-                    <input type="password" inputmode="numeric" id="lockPinInput" class="mono" placeholder="••••" style="text-align:center;letter-spacing:0.4em;font-size:22px;">
-                </div>
-                <button class="btn btn-amber btn-block" onclick="handleUnlock()">
-                    <i class="fa-solid fa-unlock"></i> <span data-ar="دخول" data-en="Enter">دخول</span>
-                </button>
-                <button class="btn btn-block" style="margin-top:10px;" onclick="resetLockRole()">
-                    <i class="fa-solid fa-arrow-right"></i> <span data-ar="رجوع" data-en="Back">رجوع</span>
-                </button>
-            </div>
+// ========================
+// تهيئة الصوت
+// ========================
+function initAudio() {
+    try {
+        audioContext = new (window.AudioContext || window.webkitAudioContext)();
+        console.log('🎵 Audio initialized for alerts');
+    } catch (e) {
+        console.warn('⚠️ Audio not supported');
+    }
+}
 
-            <div id="lockEmployeeForm" style="display:none;">
-                <div class="field">
-                    <label data-ar="اسمك" data-en="Your Name">اسمك</label>
-                    <input type="text" id="lockEmpName" placeholder="">
-                </div>
-                <div class="field">
-                    <label data-ar="PIN الموظف" data-en="Employee PIN">PIN الموظف</label>
-                    <input type="password" inputmode="numeric" id="lockEmpPin" class="mono" placeholder="••••" style="text-align:center;letter-spacing:0.4em;font-size:22px;">
-                </div>
-                <button class="btn btn-amber btn-block" onclick="handleEmployeeUnlock()">
-                    <i class="fa-solid fa-unlock"></i> <span data-ar="دخول" data-en="Enter">دخول</span>
-                </button>
-                <button class="btn btn-block" style="margin-top:10px;" onclick="resetLockRole()">
-                    <i class="fa-solid fa-arrow-right"></i> <span data-ar="رجوع" data-en="Back">رجوع</span>
-                </button>
-            </div>
+// ========================
+// تشغيل صوت التنبيه (نغمة)
+// ========================
+function playRingSound(type = 'warning') {
+    try {
+        if (!audioContext) {
+            initAudio();
+        }
+        if (!audioContext) return;
+        if (audioContext.state === 'suspended') {
+            audioContext.resume();
+        }
 
-            <div class="error-text" id="lockError"></div>
-        </div>
-        <div style="margin-top:14px;font-size:12px;color:var(--text-faint);" class="mono" id="subStatusLine"></div>
-    </div>
-</div>
+        const now = audioContext.currentTime;
 
-<!-- ============== MAIN APP ============== -->
-<div id="mainApp" class="screen">
-    <div class="app-header">
-        <div>
-            <div class="biz-name" id="headerBizName">—</div>
-            <div class="biz-sub mono" id="headerBizCode">—</div>
-        </div>
-        <div class="header-actions">
-            <button class="lang-toggle" onclick="toggleLanguage()">
-                <i class="fa-solid fa-language"></i> <span id="langToggleLabel">English</span>
-            </button>
-            <div class="icon-btn" title="متصل لحظيًا"><span class="live-dot"></span></div>
-            <button class="icon-btn" onclick="lockApp()"><i class="fa-solid fa-lock"></i></button>
-        </div>
-    </div>
+        if (type === 'warning') {
+            // نغمة تحذيرية (نغمتين متتاليتين)
+            const frequencies = [800, 1000];
+            const durations = [0.2, 0.2];
+            let time = now;
 
-    <!-- ---------- DASHBOARD ---------- -->
-    <div class="view active" id="view-dashboard">
-        <div class="section-title" data-ar="أداء اليوم" data-en="Today's Performance">أداء اليوم</div>
-        <div class="stat-grid">
-            <div class="stat-card accent"><div class="stat-label" data-ar="إيراد اليوم" data-en="Today's Revenue">إيراد اليوم</div><div class="stat-value mono" id="dashRevenue">0</div></div>
-            <div class="stat-card"><div class="stat-label" data-ar="مصروفات اليوم" data-en="Today's Expenses">مصروفات اليوم</div><div class="stat-value mono" id="dashExpenses">0</div></div>
-            <div class="stat-card"><div class="stat-label" data-ar="أجهزة شغالة" data-en="Active Devices">أجهزة شغالة</div><div class="stat-value mono" id="dashActive">0</div></div>
-            <div class="stat-card"><div class="stat-label" data-ar="أجهزة متاحة" data-en="Available Devices">أجهزة متاحة</div><div class="stat-value mono" id="dashAvailable">0</div></div>
-        </div>
-    </div>
+            frequencies.forEach((freq, i) => {
+                const osc = audioContext.createOscillator();
+                const gain = audioContext.createGain();
+                osc.connect(gain);
+                gain.connect(audioContext.destination);
+                osc.frequency.setValueAtTime(freq, time);
+                gain.gain.setValueAtTime(0.25, time);
+                gain.gain.exponentialRampToValueAtTime(0.001, time + durations[i]);
+                osc.start(time);
+                osc.stop(time + durations[i]);
+                time += durations[i] + 0.1;
+            });
+        } else if (type === 'ended') {
+            // نغمة انتهاء الوقت (3 نغمات متتالية)
+            const frequencies = [800, 600, 800];
+            const durations = [0.25, 0.25, 0.3];
+            let time = now;
 
-    <!-- ---------- STATIONS ---------- -->
-    <div class="view" id="view-stations">
-        <div class="section-title" data-ar="الأجهزة" data-en="Devices">الأجهزة</div>
-        <div class="station-grid" id="stationsGrid"></div>
-    </div>
+            frequencies.forEach((freq, i) => {
+                const osc = audioContext.createOscillator();
+                const gain = audioContext.createGain();
+                osc.connect(gain);
+                gain.connect(audioContext.destination);
+                osc.frequency.setValueAtTime(freq, time);
+                gain.gain.setValueAtTime(0.35, time);
+                gain.gain.exponentialRampToValueAtTime(0.001, time + durations[i]);
+                osc.start(time);
+                osc.stop(time + durations[i]);
+                time += durations[i] + 0.08;
+            });
+        }
 
-    <!-- ---------- SHIFT ---------- -->
-    <div class="view" id="view-shift">
-        <!-- ✅ العنوان بدون زرار تحديث -->
-        <div class="section-title" data-ar="الشيفت الحالي" data-en="Current Shift">الشيفت الحالي</div>
-        <div class="panel" id="shiftSummary"></div>
-        <button class="btn btn-red btn-block" style="margin-top:14px;" onclick="openCloseShiftSheet()">
-            <i class="fa-solid fa-lock"></i> <span data-ar="إقفال الشيفت" data-en="Close Shift">إقفال الشيفت</span>
-        </button>
-        
-        <div class="section-title" data-ar="سجل الشيفتات" data-en="Shift History">سجل الشيفتات</div>
-        
-        <div class="shift-tabs">
-            <button class="shift-tab active" data-filter="all" onclick="setShiftFilter('all')">كل الشيفتات</button>
-            <button class="shift-tab" data-filter="weekly" onclick="setShiftFilter('weekly')">أسبوعي</button>
-            <button class="shift-tab" data-filter="monthly" onclick="setShiftFilter('monthly')">شهري</button>
-        </div>
-        
-        <div id="monthlyFilter" style="display:none;margin-bottom:12px;display:flex;gap:8px;flex-wrap:wrap;align-items:center;padding:8px 0;">
-            <select id="monthSelect" style="flex:1;padding:10px;background:var(--bg-sunken);border:1px solid var(--border);border-radius:var(--radius-sm);color:var(--text);font-size:14px;">
-                <option value="0">يناير</option>
-                <option value="1">فبراير</option>
-                <option value="2">مارس</option>
-                <option value="3">أبريل</option>
-                <option value="4">مايو</option>
-                <option value="5">يونيو</option>
-                <option value="6">يوليو</option>
-                <option value="7">أغسطس</option>
-                <option value="8">سبتمبر</option>
-                <option value="9">أكتوبر</option>
-                <option value="10">نوفمبر</option>
-                <option value="11">ديسمبر</option>
-            </select>
-            <select id="yearSelect" style="flex:1;padding:10px;background:var(--bg-sunken);border:1px solid var(--border);border-radius:var(--radius-sm);color:var(--text);font-size:14px;"></select>
-            <button class="btn btn-amber" onclick="applyMonthlyFilter()" style="padding:10px 16px;flex:0 0 auto;">
-                <i class="fa-solid fa-filter"></i> <span data-ar="عرض" data-en="Apply">عرض</span>
-            </button>
-        </div>
-        
-        <div class="panel" id="shiftHistory"></div>
-    </div>
+        // اهتزاز للجوال
+        if (navigator.vibrate) {
+            navigator.vibrate(type === 'ended' ? [300, 100, 300, 100, 300] : [200, 100, 200]);
+        }
 
-    <!-- ---------- SETTINGS ---------- -->
-    <div class="view" id="view-settings">
-        <div class="section-title" style="cursor:pointer;display:flex;align-items:center;justify-content:space-between;" onclick="toggleSettingsStations()">
-            <span><span data-ar="الأجهزة" data-en="Devices">الأجهزة</span> <span id="settingsStationsCount" class="mono" style="color:var(--text-dim);font-weight:400;font-size:12px;"></span></span>
-            <i class="fa-solid fa-chevron-down" id="settingsStationsChevron" style="transition:transform .2s;"></i>
-        </div>
-        <div class="panel" id="settingsStations" style="display:none;"></div>
-        
-        <div class="panel" style="margin-top:8px;">
-            <div style="display:grid;grid-template-columns:1fr 1fr;gap:8px;margin-bottom:8px;">
-                <input type="number" id="bulkSingleRateInput" class="mono" placeholder="سعر Single (ج/ساعة)" style="width:100%;box-sizing:border-box;background:var(--bg);border:1px solid var(--border);color:var(--text);border-radius:8px;padding:10px;">
-                <input type="number" id="bulkMultiRateInput" class="mono" placeholder="سعر Multi (ج/ساعة)" style="width:100%;box-sizing:border-box;background:var(--bg);border:1px solid var(--border);color:var(--text);border-radius:8px;padding:10px;">
-            </div>
-            <div style="display:grid;grid-template-columns:1fr 1fr;gap:8px;">
-                <button class="btn btn-amber btn-block" onclick="applyBulkRate('single')"><i class="fa-solid fa-check-double"></i> <span data-ar="تثبيت Single" data-en="Apply Single">تثبيت Single</span></button>
-                <button class="btn btn-teal btn-block" onclick="applyBulkRate('multi')"><i class="fa-solid fa-check-double"></i> <span data-ar="تثبيت Multi" data-en="Apply Multi">تثبيت Multi</span></button>
-            </div>
-        </div>
-        <button class="btn btn-ghost btn-block" style="margin-top:8px;" onclick="openStationManagementSheet()"><i class="fa-solid fa-plus"></i> <span data-ar="إضافة جهاز" data-en="Add Device">إضافة جهاز</span></button>
+    } catch (e) {
+        console.warn('⚠️ Could not play sound:', e);
+    }
+}
 
-        <div class="section-title" data-ar="طرق الدفع" data-en="Payment Methods">طرق الدفع</div>
-        <div class="panel" id="settingsPaymentMethods"></div>
-        <button class="btn btn-ghost btn-block" style="margin-top:8px;" onclick="openPaymentMethodSheet()"><i class="fa-solid fa-plus"></i> <span data-ar="إضافة طريقة دفع" data-en="Add Payment Method">إضافة طريقة دفع</span></button>
+// ========================
+// عرض إشعار مرئي + صوت
+// ========================
+function showRingNotification(title, message, type = 'warning') {
+    // تشغيل الصوت
+    playRingSound(type);
 
-        <div class="section-title" data-ar="الاشتراك" data-en="Subscription">الاشتراك</div>
-        <div class="panel" id="settingsSubscription"></div>
+    // البحث عن عنصر الإشعار
+    const el = document.getElementById('ringNotification');
+    if (!el) {
+        // إذا لم يوجد، استخدم Toast كبديل
+        if (typeof showToast === 'function') {
+            showToast(`🔔 ${title}: ${message}`, type === 'ended' ? 'error' : 'warning');
+        }
+        return;
+    }
 
-        <div class="section-title" data-ar="قائمة الأكل والمشروبات" data-en="Food & Drinks Menu">قائمة الأكل والمشروبات</div>
-        <div class="panel" id="settingsMenu"></div>
-        <button class="btn btn-ghost btn-block" style="margin-top:8px;" onclick="openMenuItemSheet()"><i class="fa-solid fa-plus"></i> <span data-ar="إضافة صنف" data-en="Add Item">إضافة صنف</span></button>
+    // تحديث المحتوى
+    document.getElementById('ringTitle').textContent = title;
+    document.getElementById('ringSub').textContent = message;
 
-        <div class="section-title" data-ar="الموظفين" data-en="Employees">الموظفين</div>
-        <div class="panel" id="settingsEmployees"></div>
-        <button class="btn btn-ghost btn-block" style="margin-top:8px;" onclick="openEmployeeSheet()"><i class="fa-solid fa-plus"></i> <span data-ar="إضافة موظف" data-en="Add Employee">إضافة موظف</span></button>
+    // إظهار الإشعار
+    el.classList.add('show');
 
-        <div class="section-title" data-ar="النشاط" data-en="Business">النشاط</div>
-        <button class="btn btn-ghost btn-block" onclick="switchBusiness()"><i class="fa-solid fa-right-left"></i> <span data-ar="تبديل النشاط" data-en="Switch Business">تبديل النشاط</span></button>
-    </div>
+    // إخفاء الإشعار بعد 5 ثواني
+    clearTimeout(ringTimeout);
+    ringTimeout = setTimeout(() => {
+        el.classList.remove('show');
+    }, 5000);
 
-    <!-- ============== FAB ============== -->
-    <button class="fab" id="fabAddExpense" onclick="openExpenseSheet()" title="إضافة مصروف"><i class="fa-solid fa-wallet"></i></button>
+    // النقر على الإشعار لإخفائه
+    el.onclick = function() {
+        el.classList.remove('show');
+        clearTimeout(ringTimeout);
+    };
+}
 
-    <!-- ============== STATION SHEET ============== -->
-    <div class="overlay" id="stationOverlay">
-        <div class="sheet">
-            <div class="sheet-handle"></div>
-            <div class="sheet-title"><span id="stationSheetTitle">جهاز</span><button class="close-x" onclick="closeSheet('stationOverlay')"><i class="fa-solid fa-xmark"></i></button></div>
-            <div id="stationSheetBody"></div>
-        </div>
-    </div>
+// ========================
+// وظيفة المراقبة الأساسية
+// ========================
+function checkCountdownAlerts() {
+    // التأكد من وجود البيانات الأساسية
+    if (typeof business === 'undefined' || !business ||
+        typeof stations === 'undefined' || !stations ||
+        typeof sessions === 'undefined') {
+        return;
+    }
 
-    <!-- ============== TRANSFER SHEET ============== -->
-    <div class="overlay" id="transferOverlay">
-        <div class="sheet">
-            <div class="sheet-handle"></div>
-            <div class="sheet-title"><span data-ar="نقل الجلسة إلى جهاز آخر" data-en="Transfer Session to Another Device">نقل الجلسة إلى جهاز آخر</span><button class="close-x" onclick="closeSheet('transferOverlay')"><i class="fa-solid fa-xmark"></i></button></div>
-            <div id="transferSheetBody"></div>
-        </div>
-    </div>
+    if (Object.keys(sessions).length === 0) {
+        // إعادة ضبط حالة التنبيهات عند عدم وجود جلسات
+        for (const key in countdownAlertState) {
+            delete countdownAlertState[key];
+        }
+        return;
+    }
 
-<!-- ============== STATION MANAGEMENT SHEET ============== -->
-<div class="overlay" id="stationManagementOverlay">
-    <div class="sheet">
-        <div class="sheet-handle"></div>
-        <div class="sheet-title"><span id="stationManagementTitle" data-ar="إدارة الجهاز" data-en="Manage Device">إدارة الجهاز</span><button class="close-x" onclick="closeSheet('stationManagementOverlay')"><i class="fa-solid fa-xmark"></i></button></div>
-        <input type="hidden" id="stationManageId">
-        <div class="field">
-            <label data-ar="رقم الجهاز" data-en="Device Number">رقم الجهاز</label>
-            <input type="number" id="stationManageNumber" class="mono" min="1">
-        </div>
-        <div class="field">
-            <label data-ar="الاسم (اختياري)" data-en="Name (optional)">الاسم (اختياري)</label>
-            <input type="text" id="stationManageName" placeholder="مثال: بلايستيشن 5">
-        </div>
-        <div class="field">
-            <label data-ar="سعر Single (ج/ساعة)" data-en="Single Rate (EGP/hr)">سعر Single (ج/ساعة)</label>
-            <input type="number" id="stationManageSingleRate" class="mono" step="0.5" min="0">
-        </div>
-        <div class="field">
-            <label data-ar="سعر Multi (ج/ساعة)" data-en="Multi Rate (EGP/hr)">سعر Multi (ج/ساعة)</label>
-            <input type="number" id="stationManageMultiRate" class="mono" step="0.5" min="0">
-        </div>
-        <button class="btn btn-amber btn-block" onclick="submitStationManagement()"><span data-ar="حفظ" data-en="Save">حفظ</span></button>
-        <button class="btn btn-red btn-block" style="margin-top:8px;display:none;" id="stationDeleteBtn" onclick="deleteStation()"><i class="fa-solid fa-trash"></i> <span data-ar="حذف الجهاز" data-en="Delete Device">حذف الجهاز</span></button>
-        <div class="error-text" id="stationManageError"></div>
-    </div>
-</div>
+    // التأكد من توفر الدوال المساعدة من app.js
+    if (typeof getActiveSegmentFast !== 'function' || typeof getRemainingSeconds !== 'function') {
+        console.warn('⚠️ Alert functions not available yet');
+        return;
+    }
 
-<!-- ============== PAYMENT METHOD SHEET ============== -->
-<div class="overlay" id="paymentMethodOverlay">
-    <div class="sheet">
-        <div class="sheet-handle"></div>
-        <div class="sheet-title"><span id="paymentMethodTitle" data-ar="إضافة طريقة دفع" data-en="Add Payment Method">إضافة طريقة دفع</span><button class="close-x" onclick="closeSheet('paymentMethodOverlay')"><i class="fa-solid fa-xmark"></i></button></div>
-        <input type="hidden" id="paymentMethodId">
-        <div class="field">
-            <label data-ar="اسم طريقة الدفع" data-en="Payment Method Name">اسم طريقة الدفع</label>
-            <input type="text" id="paymentMethodName" placeholder="مثال: إنستا باي">
-        </div>
-        <div class="field">
-            <label data-ar="الأيقونة" data-en="Icon">الأيقونة</label>
-            <select id="paymentMethodIcon">
-                <option value="fa-money-bill-wave">💰 كاش</option>
-                <option value="fa-mobile-screen-button">📱 محفظة إلكترونية</option>
-                <option value="fa-credit-card">💳 بطاقة ائتمان</option>
-                <option value="fa-building-columns">🏦 تحويل بنكي</option>
-                <option value="fa-wallet">👛 محفظة رقمية</option>
-                <option value="fa-qrcode">📱 QR Code</option>
-                <option value="fa-apple-pay">🍎 Apple Pay</option>
-                <option value="fa-google-pay">🤖 Google Pay</option>
-                <option value="fa-circle-dollar">🟡 عملة رقمية</option>
-            </select>
-        </div>
-        <div class="field">
-            <label data-ar="اللون" data-en="Color">اللون</label>
-            <select id="paymentMethodColor">
-                <option value="badge-teal">أزرق/تركواز</option>
-                <option value="badge-amber">برتقالي</option>
-                <option value="badge-green">أخضر</option>
-                <option value="badge-purple">بنفسجي</option>
-                <option value="badge-red">أحمر</option>
-            </select>
-        </div>
-        <div class="field" style="display:flex;align-items:center;gap:12px;">
-            <label style="margin-bottom:0;"> <span data-ar="مفعل" data-en="Active">مفعل</span></label>
-            <input type="checkbox" id="paymentMethodActive" checked style="width:auto;">
-        </div>
-        <button class="btn btn-amber btn-block" onclick="submitPaymentMethod()"><span data-ar="حفظ" data-en="Save">حفظ</span></button>
-        <button class="btn btn-red btn-block" style="margin-top:8px;display:none;" id="paymentDeleteBtn" onclick="deletePaymentMethod()"><i class="fa-solid fa-trash"></i> <span data-ar="حذف طريقة الدفع" data-en="Delete Payment Method">حذف طريقة الدفع</span></button>
-        <div class="error-text" id="paymentMethodError"></div>
-    </div>
-</div>
+    Object.keys(sessions).forEach(stationId => {
+        const session = sessions[stationId];
+        if (!session) return;
 
-<!-- ============== EXPENSE SHEET ============== -->
-<div class="overlay" id="expenseOverlay">
-    <div class="sheet">
-        <div class="sheet-handle"></div>
-        <div class="sheet-title">
-            <span data-ar="إضافة مصروف" data-en="Add Expense">إضافة مصروف</span>
-            <button class="close-x" onclick="closeSheet('expenseOverlay')">
-                <i class="fa-solid fa-xmark"></i>
-            </button>
-        </div>
-        <div class="field">
-            <label data-ar="الوصف" data-en="Description">الوصف</label>
-            <input type="text" id="expenseDesc" placeholder="مثال: فاتورة كهرباء">
-        </div>
-        <div class="field">
-            <label data-ar="المبلغ" data-en="Amount">المبلغ</label>
-            <input type="number" id="expenseAmount" class="mono" placeholder="0">
-        </div>
-        <button class="btn btn-amber btn-block" onclick="submitExpense()">
-            <span data-ar="حفظ" data-en="Save">حفظ</span>
-        </button>
-        <div class="error-text" id="expenseError"></div>
-    </div>
-</div>
+        const activeSeg = getActiveSegmentFast(session.id);
+        if (!activeSeg || activeSeg.timer_type !== 'countdown') return;
 
-<!-- ============== MENU ITEM SHEET ============== -->
-<div class="overlay" id="menuItemOverlay">
-    <div class="sheet">
-        <div class="sheet-handle"></div>
-        <div class="sheet-title"><span id="menuItemSheetTitle" data-ar="إضافة صنف للقائمة" data-en="Add Menu Item">إضافة صنف للقائمة</span><button class="close-x" onclick="closeSheet('menuItemOverlay')"><i class="fa-solid fa-xmark"></i></button></div>
-        <input type="hidden" id="menuItemId">
-        <div class="field">
-            <label data-ar="اسم الصنف" data-en="Item Name">اسم الصنف</label>
-            <input type="text" id="menuItemName">
-        </div>
-        <div class="field">
-            <label data-ar="السعر" data-en="Price">السعر</label>
-            <input type="number" id="menuItemPrice" class="mono">
-        </div>
-        <div class="field">
-            <label data-ar="التصنيف" data-en="Category">التصنيف</label>
-            <select id="menuItemCategory">
-                <option value="cold_drinks">🧊 مشروبات باردة</option>
-                <option value="hot_drinks">☕ مشروبات ساخنة</option>
-                <option value="food">🍔 أكل</option>
-                <option value="other">📦 أخرى</option>
-            </select>
-        </div>
-        <button class="btn btn-amber btn-block" onclick="submitMenuItem()"><span data-ar="حفظ" data-en="Save">حفظ</span></button>
-        <button class="btn btn-red btn-block" style="margin-top:8px;display:none;" id="menuDeleteBtn" onclick="deleteMenuItem()"><i class="fa-solid fa-trash"></i> <span data-ar="حذف الصنف" data-en="Delete Item">حذف الصنف</span></button>
-        <div class="error-text" id="menuItemError"></div>
-    </div>
-</div>
+        const remaining = getRemainingSeconds(activeSeg);
+        const station = stations.find(s => s.id === stationId);
+        const deviceName = station ? (station.name || t('جهاز', 'Device') + ' ' + station.number) : t('جهاز', 'Device');
 
-<!-- ============== EMPLOYEE SHEET ============== -->
-<div class="overlay" id="employeeOverlay">
-    <div class="sheet">
-        <div class="sheet-handle"></div>
-        <div class="sheet-title"><span data-ar="إضافة موظف" data-en="Add Employee">إضافة موظف</span><button class="close-x" onclick="closeSheet('employeeOverlay')"><i class="fa-solid fa-xmark"></i></button></div>
-        <div class="field"><label data-ar="الاسم" data-en="Name">الاسم</label><input type="text" id="employeeName"></div>
-        <div class="field"><label data-ar="PIN (4 أرقام)" data-en="PIN (4 digits)">PIN (4 أرقام)</label><input type="text" inputmode="numeric" maxlength="6" id="employeePin" class="mono"></div>
-        <div class="field">
-            <label data-ar="الصلاحيات" data-en="Permissions">الصلاحيات</label>
-            <label style="display:flex;align-items:center;gap:8px;font-weight:500;color:var(--text);margin-bottom:6px;"><input type="checkbox" id="permStations" checked> <span data-ar="إدارة الأجهزة والجلسات" data-en="Manage devices & sessions">إدارة الأجهزة والجلسات</span></label>
-            <label style="display:flex;align-items:center;gap:8px;font-weight:500;color:var(--text);margin-bottom:6px;"><input type="checkbox" id="permShift"> <span data-ar="إقفال الشيفت" data-en="Close shift">إقفال الشيفت</span></label>
-            <label style="display:flex;align-items:center;gap:8px;font-weight:500;color:var(--text);"><input type="checkbox" id="permSettings"> <span data-ar="الدخول والتعديل في الإعدادات" data-en="Access & edit Settings">الدخول والتعديل في الإعدادات</span></label>
-        </div>
-        <p style="font-size:11.5px;color:var(--text-faint);margin-bottom:12px;" data-ar="ملاحظة أمان: الـ PIN مخزّن كنص عادي حاليًا لأن التطبيق مفيش له باك إند منفصل — مناسب لتحكم داخلي بسيط، مش بديل عن نظام مستخدمين حقيقي." data-en="Security note: PIN is stored as plain text currently as the app has no separate backend — suitable for simple internal control, not a replacement for a real user system.">
-            ملاحظة أمان: الـ PIN مخزّن كنص عادي حاليًا لأن التطبيق مفيش له باك إند منفصل — مناسب لتحكم داخلي بسيط، مش بديل عن نظام مستخدمين حقيقي.
-        </p>
-        <button class="btn btn-amber btn-block" onclick="submitEmployee()"><span data-ar="حفظ" data-en="Save">حفظ</span></button>
-        <div class="error-text" id="employeeError"></div>
-    </div>
-</div>
+        if (remaining <= 0) {
+            // انتهى الوقت
+            if (countdownAlertState[stationId] !== 'ended') {
+                countdownAlertState[stationId] = 'ended';
+                const msg = t(`⏰ انتهى وقت جهاز ${deviceName}`, `⏰ Time's up for device ${deviceName}`);
+                showRingNotification(
+                    t('⏰ انتهى الوقت!', '⏰ Time\'s up!'),
+                    msg,
+                    'ended'
+                );
+                // استخدام Toast أيضاً للتأكيد
+                if (typeof showToast === 'function') {
+                    showToast(msg, 'error');
+                }
+            }
+        } else if (remaining <= ALERT_THRESHOLD) {
+            // باقي وقت قليل
+            if (countdownAlertState[stationId] !== 'warning') {
+                countdownAlertState[stationId] = 'warning';
+                const minutes = Math.floor(remaining / 60);
+                const seconds = Math.round(remaining % 60);
+                let timeStr = '';
+                if (minutes > 0) {
+                    timeStr = `${minutes} ${t('دقيقة', 'minute')}`;
+                    if (seconds > 0) timeStr += ` ${seconds} ${t('ثانية', 'second')}`;
+                } else {
+                    timeStr = `${seconds} ${t('ثانية', 'second')}`;
+                }
+                const msg = t(`⚠️ جهاز ${deviceName}: متبقي ${timeStr}`, `⚠️ Device ${deviceName}: ${timeStr} remaining`);
+                showRingNotification(
+                    t('⏳ وقت شبه خلص', '⏳ Time almost up'),
+                    msg,
+                    'warning'
+                );
+                if (typeof showToast === 'function') {
+                    showToast(msg, 'warning');
+                }
+            }
+        } else {
+            // أكثر من الحد، إعادة ضبط الحالة
+            if (countdownAlertState[stationId]) {
+                delete countdownAlertState[stationId];
+            }
+        }
+    });
+}
 
-<!-- ============== CLOSE SHIFT SHEET ============== -->
-<div class="overlay" id="closeShiftOverlay">
-    <div class="sheet">
-        <div class="sheet-handle"></div>
-        <div class="sheet-title"><span data-ar="تأكيد إقفال الشيفت" data-en="Confirm Close Shift">تأكيد إقفال الشيفت</span><button class="close-x" onclick="closeSheet('closeShiftOverlay')"><i class="fa-solid fa-xmark"></i></button></div>
-        <div class="panel" id="closeShiftSummary" style="margin-bottom:14px;"></div>
-        <button class="btn btn-amber btn-block" onclick="confirmCloseShift()"><i class="fa-solid fa-lock"></i> <span data-ar="تأكيد الإقفال" data-en="Confirm Close">تأكيد الإقفال</span></button>
-    </div>
-</div>
+// ========================
+// تشغيل / إيقاف المراقبة
+// ========================
+function startCountdownAlerts() {
+    if (countdownAlertInterval) {
+        clearInterval(countdownAlertInterval);
+        countdownAlertInterval = null;
+    }
+    countdownAlertInterval = setInterval(checkCountdownAlerts, 1000);
+    console.log('🔔 Countdown alerts started (Ring system)');
+}
 
-<div class="overlay" id="shiftDetailsOverlay">
-    <div class="sheet">
-        <div class="sheet-handle"></div>
-        <div class="sheet-title"><span data-ar="تفاصيل الشيفت" data-en="Shift Details">تفاصيل الشيفت</span><button class="close-x" onclick="closeSheet('shiftDetailsOverlay')"><i class="fa-solid fa-xmark"></i></button></div>
-        <div class="panel" id="shiftDetailsSummary" style="margin-bottom:14px;"></div>
-    </div>
-</div>
+function stopCountdownAlerts() {
+    if (countdownAlertInterval) {
+        clearInterval(countdownAlertInterval);
+        countdownAlertInterval = null;
+        console.log('🔕 Countdown alerts stopped');
+    }
+}
 
-<div class="toast" id="toast"></div>
-<div id="printArea" style="display:none;"></div>
+// ========================
+// التهيئة التلقائية عند تحميل الصفحة
+// ========================
+function initAlerts() {
+    // ننتظر حتى تتوفر البيانات الأساسية
+    if (typeof business !== 'undefined' && business &&
+        typeof stations !== 'undefined' && stations && stations.length > 0) {
+        startCountdownAlerts();
+    } else {
+        // نعيد المحاولة بعد 500 مللي ثانية
+        setTimeout(initAlerts, 500);
+    }
+}
 
-<!-- bottom nav -->
-<div class="bottom-nav">
-    <button class="nav-btn active" data-view="view-dashboard" onclick="navigateTo('view-dashboard')"><i class="fa-solid fa-chart-simple"></i><span data-ar="الرئيسية" data-en="Home">الرئيسية</span></button>
-    <button class="nav-btn" data-view="view-stations" onclick="navigateTo('view-stations')"><i class="fa-solid fa-gamepad"></i><span data-ar="الأجهزة" data-en="Devices">الأجهزة</span></button>
-    <button class="nav-btn" data-view="view-shift" onclick="navigateTo('view-shift')"><i class="fa-solid fa-clock"></i><span data-ar="الشيفت" data-en="Shift">الشيفت</span></button>
-    <button class="nav-btn" data-view="view-settings" onclick="navigateTo('view-settings')"><i class="fa-solid fa-gear"></i><span data-ar="الإعدادات" data-en="Settings">الإعدادات</span></button>
-</div>
-</body>
-</html>
+// بدء المراقبة بعد تحميل الصفحة
+window.addEventListener('load', initAlerts);
+
+// إيقاف المراقبة عند إغلاق الصفحة
+window.addEventListener('beforeunload', function() {
+    stopCountdownAlerts();
+});
+
+// التصدير للاستخدام الخارجي (اختياري)
+window.startCountdownAlerts = startCountdownAlerts;
+window.stopCountdownAlerts = stopCountdownAlerts;
