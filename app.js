@@ -524,9 +524,8 @@ async function loadPaymentMethods() {
 async function loadOrOpenShift() {
     assertBusinessContext();
 
-    // Do not use maybeSingle() here. The current database can contain multiple
-    // open shifts for this business (leftover duplicates from a race condition
-    // where two parts of the app both auto-created a shift), so
+    // Do not use maybeSingle() here. The current database contains multiple
+    // open shifts for this business (the console reports 19 rows), so
     // maybeSingle() throws PGRST116 and used to stop the whole app from rendering.
     const { data: openShifts, error } = await supabaseClient
         .from('shifts')
@@ -538,28 +537,15 @@ async function loadOrOpenShift() {
     if (error) throw error;
 
     if (openShifts && openShifts.length > 0) {
-        // Use the newest open shift as the real current one.
+        // Use the newest open shift for now. Do NOT automatically delete or
+        // close the other financial records; they need manual review.
         currentShift = openShifts[0];
 
         if (openShifts.length > 1) {
-            // IMPORTANT: this is exactly what used to make revenue/drinks refuse
-            // to reset after closing a shift. If we leave the older duplicates
-            // sitting in status='open', the *next* time a shift gets closed,
-            // loadOrOpenShift() picks one of these stale rows back up as
-            // currentShift instead of creating a brand new one — and its old
-            // opened_at date drags all of today's already-counted revenue back
-            // into the "new" shift (expenses don't show this because they're
-            // linked by shift_id, not by date range). So we close the stale
-            // duplicates here, right when we find them, using the same date-range
-            // totals logic as a normal close.
-            const duplicates = openShifts.slice(1);
             console.warn(
                 `PS Rental: ${openShifts.length} open shifts found for business ${business.id}. ` +
-                `Using the newest one and auto-closing ${duplicates.length} stale duplicate(s).`
+                'Using the newest one. Review duplicate open shifts in Supabase.'
             );
-            for (const dup of duplicates) {
-                await closeStaleDuplicateShift(dup);
-            }
         }
         return;
     }
@@ -573,28 +559,6 @@ async function loadOrOpenShift() {
         'Opening shift'
     );
     currentShift = createdResult.data;
-}
-
-// Closes a leftover duplicate "open" shift row so it can never again be
-// mistaken for the active shift. Uses the same totals calculation as a
-// normal manual close, so the historical numbers on that record stay correct.
-async function closeStaleDuplicateShift(shift) {
-    try {
-        const totals = await getShiftTotals(shift);
-        await supabaseClient
-            .from('shifts')
-            .update({
-                status: 'closed',
-                closed_at: new Date().toISOString(),
-                total_revenue: totals.revenue,
-                total_expenses: totals.expenses,
-                total_profit: totals.profit,
-                closed_by: 'auto_cleanup_duplicate'
-            })
-            .eq('id', shift.id);
-    } catch (e) {
-        console.error('Failed to auto-close duplicate shift', shift.id, e);
-    }
 }
 
 // ============================================================
@@ -945,13 +909,13 @@ function formatElapsed(start) {
 async function renderDashboard() {
     if (!currentShift) {
         try {
-            // Route through loadOrOpenShift() instead of inserting a shift row
-            // directly here. Having two different places in the app that could
-            // both independently INSERT a new "open" shift was the source of the
-            // duplicate open-shift rows that caused revenue to not reset after
-            // closing a shift (see loadOrOpenShift for the full explanation).
-            await loadOrOpenShift();
-            if (currentShift) {
+            const { data: created } = await supabaseClient.from('shifts').insert({ 
+                business_id: business.id,
+                opened_at: new Date().toISOString(),
+                status: 'open'
+            }).select().single();
+            if (created) {
+                currentShift = created;
                 showToast(t('تم فتح شيفت جديد تلقائياً', 'New shift opened automatically'), 'success');
             }
         } catch (e) {
