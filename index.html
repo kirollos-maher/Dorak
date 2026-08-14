@@ -3,22 +3,62 @@
 <head>
 <meta charset="UTF-8">
 <meta name="viewport" content="width=device-width, initial-scale=1.0, maximum-scale=1, user-scalable=no">
-<title>PS Rental Pro</title>
+<title>DORAK - Gaming Lounge Management</title>
 <link rel="preconnect" href="https://fonts.googleapis.com">
 <link href="https://fonts.googleapis.com/css2?family=Cairo:wght@500;600;700;800&family=JetBrains+Mono:wght@500;600;700&display=swap" rel="stylesheet">
 <link rel="stylesheet" href="https://cdnjs.cloudflare.com/ajax/libs/font-awesome/6.5.1/css/all.min.css">
 <script src="https://cdn.jsdelivr.net/npm/@supabase/supabase-js@2"></script>
 <link rel="stylesheet" href="style.css">
 <script src="app.js" defer></script>
+<!-- ✅ نظام التنبيهات الجديد -->
+<script src="alerts.js" defer></script>
+
+<style>
+    /* ✅ إضافة لـ DORAK Brand في الرأس */
+    .dorak-brand {
+        font-family: 'JetBrains Mono', monospace;
+        font-weight: 800;
+        font-size: 18px;
+        color: var(--amber);
+        letter-spacing: 0.08em;
+        margin-left: 12px;
+        text-shadow: 0 0 20px rgba(255, 138, 30, 0.3);
+        user-select: none;
+    }
+    .dorak-brand .star {
+        color: var(--amber);
+        opacity: 0.7;
+    }
+    /* تأكد إن اللون يبقى واضح في الرأس */
+    .app-header .dorak-brand {
+        color: var(--amber);
+    }
+    /* لو عايز تغير اللون في الوضع الفاتح */
+    [data-theme="light"] .dorak-brand {
+        color: var(--amber-dark);
+        text-shadow: 0 0 20px rgba(255, 138, 30, 0.15);
+    }
+</style>
 </head>
 <body>
-<div id="v2SecurityBanner" style="display:none;position:fixed;top:0;left:0;right:0;z-index:1000;background:#3b1f00;color:#ffd8a8;padding:8px 12px;text-align:center;font:600 12px Cairo,sans-serif;">V2: تأكد من تطبيق ملف SQL على Supabase قبل استخدام النظام في الإنتاج.</div>
 
+<!-- 🎯 عنصر التنبيه المنبثق (Ring Notification) -->
+<div class="ring-notification" id="ringNotification">
+    <div style="display:flex; align-items:center; gap:12px;">
+        <div class="ring-icon">🔔</div>
+        <div>
+            <div class="ring-title" id="ringTitle">تنبيه</div>
+            <div class="ring-sub" id="ringSub">تفاصيل التنبيه</div>
+        </div>
+    </div>
+</div>
+
+<div id="v2SecurityBanner" style="display:none;position:fixed;top:0;left:0;right:0;z-index:1000;background:#3b1f00;color:#ffd8a8;padding:8px 12px;text-align:center;font:600 12px Cairo,sans-serif;">V2: تأكد من تطبيق ملف SQL على Supabase قبل استخدام النظام في الإنتاج.</div>
 
 <!-- ============== SETUP SCREEN ============== -->
 <div id="setupScreen" class="screen active">
     <div class="centered-screen">
-        <div class="brand-mark">PS RENTAL PRO</div>
+        <div class="brand-mark">✦ DORAK ✦</div>
         <div class="brand-title" data-ar="تسجيل الدخول للنشاط" data-en="Business Login">تسجيل الدخول للنشاط</div>
         <div class="card">
             <div class="field">
@@ -36,7 +76,7 @@
 <!-- ============== ACTIVATION SCREEN ============== -->
 <div id="activationScreen" class="screen">
     <div class="centered-screen">
-        <div class="brand-mark">تفعيل الجهاز</div>
+        <div class="brand-mark">✦ DORAK ✦</div>
         <div class="brand-title" id="activationBizName">—</div>
         <div class="card">
             <p style="color:var(--text-dim);font-size:13px;margin-bottom:16px;" data-ar="الجهاز ده لسه مش مفعّل على النشاط ده. أدخل كود التفعيل اللي معاك." data-en="This device is not activated for this business. Enter the activation code you have.">
@@ -58,8 +98,9 @@
 <!-- ============== LOCK SCREEN ============== -->
 <div id="lockScreen" class="screen">
     <div class="centered-screen">
-        <div class="brand-mark" id="lockBizCode">—</div>
-        <div class="brand-title" id="lockBizName">—</div>
+        <div class="brand-mark">✦ DORAK ✦</div>
+        <div class="brand-mark" id="lockBizCode" style="font-size:14px; color:var(--text-dim);">—</div>
+        <div class="brand-title" id="lockBizName" style="font-size:22px;">—</div>
         <div class="card">
             <div id="lockRoleChoice">
                 <label data-ar="هل انت؟" data-en="Are you?" style="display:block;margin-bottom:10px;">هل انت؟</label>
@@ -115,6 +156,8 @@
             <div class="biz-sub mono" id="headerBizCode">—</div>
         </div>
         <div class="header-actions">
+            <!-- ✅ اسم DORAK في أعلى اليمين (قبل الأزرار) -->
+            <span class="dorak-brand">✦ DORAK ✦</span>
             <button class="lang-toggle" onclick="toggleLanguage()">
                 <i class="fa-solid fa-language"></i> <span id="langToggleLabel">English</span>
             </button>
@@ -142,7 +185,6 @@
 
     <!-- ---------- SHIFT ---------- -->
     <div class="view" id="view-shift">
-        <!-- ✅ العنوان بدون زرار تحديث -->
         <div class="section-title" data-ar="الشيفت الحالي" data-en="Current Shift">الشيفت الحالي</div>
         <div class="panel" id="shiftSummary"></div>
         <button class="btn btn-red btn-block" style="margin-top:14px;" onclick="openCloseShiftSheet()">
@@ -241,180 +283,182 @@
         </div>
     </div>
 
-<!-- ============== STATION MANAGEMENT SHEET ============== -->
-<div class="overlay" id="stationManagementOverlay">
-    <div class="sheet">
-        <div class="sheet-handle"></div>
-        <div class="sheet-title"><span id="stationManagementTitle" data-ar="إدارة الجهاز" data-en="Manage Device">إدارة الجهاز</span><button class="close-x" onclick="closeSheet('stationManagementOverlay')"><i class="fa-solid fa-xmark"></i></button></div>
-        <input type="hidden" id="stationManageId">
-        <div class="field">
-            <label data-ar="رقم الجهاز" data-en="Device Number">رقم الجهاز</label>
-            <input type="number" id="stationManageNumber" class="mono" min="1">
+    <!-- ============== STATION MANAGEMENT SHEET ============== -->
+    <div class="overlay" id="stationManagementOverlay">
+        <div class="sheet">
+            <div class="sheet-handle"></div>
+            <div class="sheet-title"><span id="stationManagementTitle" data-ar="إدارة الجهاز" data-en="Manage Device">إدارة الجهاز</span><button class="close-x" onclick="closeSheet('stationManagementOverlay')"><i class="fa-solid fa-xmark"></i></button></div>
+            <input type="hidden" id="stationManageId">
+            <div class="field">
+                <label data-ar="رقم الجهاز" data-en="Device Number">رقم الجهاز</label>
+                <input type="number" id="stationManageNumber" class="mono" min="1">
+            </div>
+            <div class="field">
+                <label data-ar="الاسم (اختياري)" data-en="Name (optional)">الاسم (اختياري)</label>
+                <input type="text" id="stationManageName" placeholder="مثال: بلايستيشن 5">
+            </div>
+            <div class="field">
+                <label data-ar="سعر Single (ج/ساعة)" data-en="Single Rate (EGP/hr)">سعر Single (ج/ساعة)</label>
+                <input type="number" id="stationManageSingleRate" class="mono" step="0.5" min="0">
+            </div>
+            <div class="field">
+                <label data-ar="سعر Multi (ج/ساعة)" data-en="Multi Rate (EGP/hr)">سعر Multi (ج/ساعة)</label>
+                <input type="number" id="stationManageMultiRate" class="mono" step="0.5" min="0">
+            </div>
+            <button class="btn btn-amber btn-block" onclick="submitStationManagement()"><span data-ar="حفظ" data-en="Save">حفظ</span></button>
+            <button class="btn btn-red btn-block" style="margin-top:8px;display:none;" id="stationDeleteBtn" onclick="deleteStation()"><i class="fa-solid fa-trash"></i> <span data-ar="حذف الجهاز" data-en="Delete Device">حذف الجهاز</span></button>
+            <div class="error-text" id="stationManageError"></div>
         </div>
-        <div class="field">
-            <label data-ar="الاسم (اختياري)" data-en="Name (optional)">الاسم (اختياري)</label>
-            <input type="text" id="stationManageName" placeholder="مثال: بلايستيشن 5">
-        </div>
-        <div class="field">
-            <label data-ar="سعر Single (ج/ساعة)" data-en="Single Rate (EGP/hr)">سعر Single (ج/ساعة)</label>
-            <input type="number" id="stationManageSingleRate" class="mono" step="0.5" min="0">
-        </div>
-        <div class="field">
-            <label data-ar="سعر Multi (ج/ساعة)" data-en="Multi Rate (EGP/hr)">سعر Multi (ج/ساعة)</label>
-            <input type="number" id="stationManageMultiRate" class="mono" step="0.5" min="0">
-        </div>
-        <button class="btn btn-amber btn-block" onclick="submitStationManagement()"><span data-ar="حفظ" data-en="Save">حفظ</span></button>
-        <button class="btn btn-red btn-block" style="margin-top:8px;display:none;" id="stationDeleteBtn" onclick="deleteStation()"><i class="fa-solid fa-trash"></i> <span data-ar="حذف الجهاز" data-en="Delete Device">حذف الجهاز</span></button>
-        <div class="error-text" id="stationManageError"></div>
     </div>
-</div>
 
-<!-- ============== PAYMENT METHOD SHEET ============== -->
-<div class="overlay" id="paymentMethodOverlay">
-    <div class="sheet">
-        <div class="sheet-handle"></div>
-        <div class="sheet-title"><span id="paymentMethodTitle" data-ar="إضافة طريقة دفع" data-en="Add Payment Method">إضافة طريقة دفع</span><button class="close-x" onclick="closeSheet('paymentMethodOverlay')"><i class="fa-solid fa-xmark"></i></button></div>
-        <input type="hidden" id="paymentMethodId">
-        <div class="field">
-            <label data-ar="اسم طريقة الدفع" data-en="Payment Method Name">اسم طريقة الدفع</label>
-            <input type="text" id="paymentMethodName" placeholder="مثال: إنستا باي">
+    <!-- ============== PAYMENT METHOD SHEET ============== -->
+    <div class="overlay" id="paymentMethodOverlay">
+        <div class="sheet">
+            <div class="sheet-handle"></div>
+            <div class="sheet-title"><span id="paymentMethodTitle" data-ar="إضافة طريقة دفع" data-en="Add Payment Method">إضافة طريقة دفع</span><button class="close-x" onclick="closeSheet('paymentMethodOverlay')"><i class="fa-solid fa-xmark"></i></button></div>
+            <input type="hidden" id="paymentMethodId">
+            <div class="field">
+                <label data-ar="اسم طريقة الدفع" data-en="Payment Method Name">اسم طريقة الدفع</label>
+                <input type="text" id="paymentMethodName" placeholder="مثال: إنستا باي">
+            </div>
+            <div class="field">
+                <label data-ar="الأيقونة" data-en="Icon">الأيقونة</label>
+                <select id="paymentMethodIcon">
+                    <option value="fa-money-bill-wave">💰 كاش</option>
+                    <option value="fa-mobile-screen-button">📱 محفظة إلكترونية</option>
+                    <option value="fa-credit-card">💳 بطاقة ائتمان</option>
+                    <option value="fa-building-columns">🏦 تحويل بنكي</option>
+                    <option value="fa-wallet">👛 محفظة رقمية</option>
+                    <option value="fa-qrcode">📱 QR Code</option>
+                    <option value="fa-apple-pay">🍎 Apple Pay</option>
+                    <option value="fa-google-pay">🤖 Google Pay</option>
+                    <option value="fa-circle-dollar">🟡 عملة رقمية</option>
+                </select>
+            </div>
+            <div class="field">
+                <label data-ar="اللون" data-en="Color">اللون</label>
+                <select id="paymentMethodColor">
+                    <option value="badge-teal">أزرق/تركواز</option>
+                    <option value="badge-amber">برتقالي</option>
+                    <option value="badge-green">أخضر</option>
+                    <option value="badge-purple">بنفسجي</option>
+                    <option value="badge-red">أحمر</option>
+                </select>
+            </div>
+            <div class="field" style="display:flex;align-items:center;gap:12px;">
+                <label style="margin-bottom:0;"> <span data-ar="مفعل" data-en="Active">مفعل</span></label>
+                <input type="checkbox" id="paymentMethodActive" checked style="width:auto;">
+            </div>
+            <button class="btn btn-amber btn-block" onclick="submitPaymentMethod()"><span data-ar="حفظ" data-en="Save">حفظ</span></button>
+            <button class="btn btn-red btn-block" style="margin-top:8px;display:none;" id="paymentDeleteBtn" onclick="deletePaymentMethod()"><i class="fa-solid fa-trash"></i> <span data-ar="حذف طريقة الدفع" data-en="Delete Payment Method">حذف طريقة الدفع</span></button>
+            <div class="error-text" id="paymentMethodError"></div>
         </div>
-        <div class="field">
-            <label data-ar="الأيقونة" data-en="Icon">الأيقونة</label>
-            <select id="paymentMethodIcon">
-                <option value="fa-money-bill-wave">💰 كاش</option>
-                <option value="fa-mobile-screen-button">📱 محفظة إلكترونية</option>
-                <option value="fa-credit-card">💳 بطاقة ائتمان</option>
-                <option value="fa-building-columns">🏦 تحويل بنكي</option>
-                <option value="fa-wallet">👛 محفظة رقمية</option>
-                <option value="fa-qrcode">📱 QR Code</option>
-                <option value="fa-apple-pay">🍎 Apple Pay</option>
-                <option value="fa-google-pay">🤖 Google Pay</option>
-                <option value="fa-circle-dollar">🟡 عملة رقمية</option>
-            </select>
-        </div>
-        <div class="field">
-            <label data-ar="اللون" data-en="Color">اللون</label>
-            <select id="paymentMethodColor">
-                <option value="badge-teal">أزرق/تركواز</option>
-                <option value="badge-amber">برتقالي</option>
-                <option value="badge-green">أخضر</option>
-                <option value="badge-purple">بنفسجي</option>
-                <option value="badge-red">أحمر</option>
-            </select>
-        </div>
-        <div class="field" style="display:flex;align-items:center;gap:12px;">
-            <label style="margin-bottom:0;"> <span data-ar="مفعل" data-en="Active">مفعل</span></label>
-            <input type="checkbox" id="paymentMethodActive" checked style="width:auto;">
-        </div>
-        <button class="btn btn-amber btn-block" onclick="submitPaymentMethod()"><span data-ar="حفظ" data-en="Save">حفظ</span></button>
-        <button class="btn btn-red btn-block" style="margin-top:8px;display:none;" id="paymentDeleteBtn" onclick="deletePaymentMethod()"><i class="fa-solid fa-trash"></i> <span data-ar="حذف طريقة الدفع" data-en="Delete Payment Method">حذف طريقة الدفع</span></button>
-        <div class="error-text" id="paymentMethodError"></div>
     </div>
-</div>
 
-<!-- ============== EXPENSE SHEET ============== -->
-<div class="overlay" id="expenseOverlay">
-    <div class="sheet">
-        <div class="sheet-handle"></div>
-        <div class="sheet-title">
-            <span data-ar="إضافة مصروف" data-en="Add Expense">إضافة مصروف</span>
-            <button class="close-x" onclick="closeSheet('expenseOverlay')">
-                <i class="fa-solid fa-xmark"></i>
+    <!-- ============== EXPENSE SHEET ============== -->
+    <div class="overlay" id="expenseOverlay">
+        <div class="sheet">
+            <div class="sheet-handle"></div>
+            <div class="sheet-title">
+                <span data-ar="إضافة مصروف" data-en="Add Expense">إضافة مصروف</span>
+                <button class="close-x" onclick="closeSheet('expenseOverlay')">
+                    <i class="fa-solid fa-xmark"></i>
+                </button>
+            </div>
+            <div class="field">
+                <label data-ar="الوصف" data-en="Description">الوصف</label>
+                <input type="text" id="expenseDesc" placeholder="مثال: فاتورة كهرباء">
+            </div>
+            <div class="field">
+                <label data-ar="المبلغ" data-en="Amount">المبلغ</label>
+                <input type="number" id="expenseAmount" class="mono" placeholder="0">
+            </div>
+            <button class="btn btn-amber btn-block" onclick="submitExpense()">
+                <span data-ar="حفظ" data-en="Save">حفظ</span>
             </button>
+            <div class="error-text" id="expenseError"></div>
         </div>
-        <div class="field">
-            <label data-ar="الوصف" data-en="Description">الوصف</label>
-            <input type="text" id="expenseDesc" placeholder="مثال: فاتورة كهرباء">
-        </div>
-        <div class="field">
-            <label data-ar="المبلغ" data-en="Amount">المبلغ</label>
-            <input type="number" id="expenseAmount" class="mono" placeholder="0">
-        </div>
-        <button class="btn btn-amber btn-block" onclick="submitExpense()">
-            <span data-ar="حفظ" data-en="Save">حفظ</span>
-        </button>
-        <div class="error-text" id="expenseError"></div>
     </div>
-</div>
 
-<!-- ============== MENU ITEM SHEET ============== -->
-<div class="overlay" id="menuItemOverlay">
-    <div class="sheet">
-        <div class="sheet-handle"></div>
-        <div class="sheet-title"><span id="menuItemSheetTitle" data-ar="إضافة صنف للقائمة" data-en="Add Menu Item">إضافة صنف للقائمة</span><button class="close-x" onclick="closeSheet('menuItemOverlay')"><i class="fa-solid fa-xmark"></i></button></div>
-        <input type="hidden" id="menuItemId">
-        <div class="field">
-            <label data-ar="اسم الصنف" data-en="Item Name">اسم الصنف</label>
-            <input type="text" id="menuItemName">
+    <!-- ============== MENU ITEM SHEET ============== -->
+    <div class="overlay" id="menuItemOverlay">
+        <div class="sheet">
+            <div class="sheet-handle"></div>
+            <div class="sheet-title"><span id="menuItemSheetTitle" data-ar="إضافة صنف للقائمة" data-en="Add Menu Item">إضافة صنف للقائمة</span><button class="close-x" onclick="closeSheet('menuItemOverlay')"><i class="fa-solid fa-xmark"></i></button></div>
+            <input type="hidden" id="menuItemId">
+            <div class="field">
+                <label data-ar="اسم الصنف" data-en="Item Name">اسم الصنف</label>
+                <input type="text" id="menuItemName">
+            </div>
+            <div class="field">
+                <label data-ar="السعر" data-en="Price">السعر</label>
+                <input type="number" id="menuItemPrice" class="mono">
+            </div>
+            <div class="field">
+                <label data-ar="التصنيف" data-en="Category">التصنيف</label>
+                <select id="menuItemCategory">
+                    <option value="cold_drinks">🧊 مشروبات باردة</option>
+                    <option value="hot_drinks">☕ مشروبات ساخنة</option>
+                    <option value="food">🍔 أكل</option>
+                    <option value="other">📦 أخرى</option>
+                </select>
+            </div>
+            <button class="btn btn-amber btn-block" onclick="submitMenuItem()"><span data-ar="حفظ" data-en="Save">حفظ</span></button>
+            <button class="btn btn-red btn-block" style="margin-top:8px;display:none;" id="menuDeleteBtn" onclick="deleteMenuItem()"><i class="fa-solid fa-trash"></i> <span data-ar="حذف الصنف" data-en="Delete Item">حذف الصنف</span></button>
+            <div class="error-text" id="menuItemError"></div>
         </div>
-        <div class="field">
-            <label data-ar="السعر" data-en="Price">السعر</label>
-            <input type="number" id="menuItemPrice" class="mono">
+    </div>
+
+    <!-- ============== EMPLOYEE SHEET ============== -->
+    <div class="overlay" id="employeeOverlay">
+        <div class="sheet">
+            <div class="sheet-handle"></div>
+            <div class="sheet-title"><span data-ar="إضافة موظف" data-en="Add Employee">إضافة موظف</span><button class="close-x" onclick="closeSheet('employeeOverlay')"><i class="fa-solid fa-xmark"></i></button></div>
+            <div class="field"><label data-ar="الاسم" data-en="Name">الاسم</label><input type="text" id="employeeName"></div>
+            <div class="field"><label data-ar="PIN (4 أرقام)" data-en="PIN (4 digits)">PIN (4 أرقام)</label><input type="text" inputmode="numeric" maxlength="6" id="employeePin" class="mono"></div>
+            <div class="field">
+                <label data-ar="الصلاحيات" data-en="Permissions">الصلاحيات</label>
+                <label style="display:flex;align-items:center;gap:8px;font-weight:500;color:var(--text);margin-bottom:6px;"><input type="checkbox" id="permStations" checked> <span data-ar="إدارة الأجهزة والجلسات" data-en="Manage devices & sessions">إدارة الأجهزة والجلسات</span></label>
+                <label style="display:flex;align-items:center;gap:8px;font-weight:500;color:var(--text);margin-bottom:6px;"><input type="checkbox" id="permShift"> <span data-ar="إقفال الشيفت" data-en="Close shift">إقفال الشيفت</span></label>
+                <label style="display:flex;align-items:center;gap:8px;font-weight:500;color:var(--text);"><input type="checkbox" id="permSettings"> <span data-ar="الدخول والتعديل في الإعدادات" data-en="Access & edit Settings">الدخول والتعديل في الإعدادات</span></label>
+            </div>
+            <p style="font-size:11.5px;color:var(--text-faint);margin-bottom:12px;" data-ar="ملاحظة أمان: الـ PIN مخزّن كنص عادي حاليًا لأن التطبيق مفيش له باك إند منفصل — مناسب لتحكم داخلي بسيط، مش بديل عن نظام مستخدمين حقيقي." data-en="Security note: PIN is stored as plain text currently as the app has no separate backend — suitable for simple internal control, not a replacement for a real user system.">
+                ملاحظة أمان: الـ PIN مخزّن كنص عادي حاليًا لأن التطبيق مفيش له باك إند منفصل — مناسب لتحكم داخلي بسيط، مش بديل عن نظام مستخدمين حقيقي.
+            </p>
+            <button class="btn btn-amber btn-block" onclick="submitEmployee()"><span data-ar="حفظ" data-en="Save">حفظ</span></button>
+            <div class="error-text" id="employeeError"></div>
         </div>
-        <div class="field">
-            <label data-ar="التصنيف" data-en="Category">التصنيف</label>
-            <select id="menuItemCategory">
-                <option value="cold_drinks">🧊 مشروبات باردة</option>
-                <option value="hot_drinks">☕ مشروبات ساخنة</option>
-                <option value="food">🍔 أكل</option>
-                <option value="other">📦 أخرى</option>
-            </select>
+    </div>
+
+    <!-- ============== CLOSE SHIFT SHEET ============== -->
+    <div class="overlay" id="closeShiftOverlay">
+        <div class="sheet">
+            <div class="sheet-handle"></div>
+            <div class="sheet-title"><span data-ar="تأكيد إقفال الشيفت" data-en="Confirm Close Shift">تأكيد إقفال الشيفت</span><button class="close-x" onclick="closeSheet('closeShiftOverlay')"><i class="fa-solid fa-xmark"></i></button></div>
+            <div class="panel" id="closeShiftSummary" style="margin-bottom:14px;"></div>
+            <button class="btn btn-amber btn-block" onclick="confirmCloseShift()"><i class="fa-solid fa-lock"></i> <span data-ar="تأكيد الإقفال" data-en="Confirm Close">تأكيد الإقفال</span></button>
         </div>
-        <button class="btn btn-amber btn-block" onclick="submitMenuItem()"><span data-ar="حفظ" data-en="Save">حفظ</span></button>
-        <button class="btn btn-red btn-block" style="margin-top:8px;display:none;" id="menuDeleteBtn" onclick="deleteMenuItem()"><i class="fa-solid fa-trash"></i> <span data-ar="حذف الصنف" data-en="Delete Item">حذف الصنف</span></button>
-        <div class="error-text" id="menuItemError"></div>
     </div>
-</div>
 
-<!-- ============== EMPLOYEE SHEET ============== -->
-<div class="overlay" id="employeeOverlay">
-    <div class="sheet">
-        <div class="sheet-handle"></div>
-        <div class="sheet-title"><span data-ar="إضافة موظف" data-en="Add Employee">إضافة موظف</span><button class="close-x" onclick="closeSheet('employeeOverlay')"><i class="fa-solid fa-xmark"></i></button></div>
-        <div class="field"><label data-ar="الاسم" data-en="Name">الاسم</label><input type="text" id="employeeName"></div>
-        <div class="field"><label data-ar="PIN (4 أرقام)" data-en="PIN (4 digits)">PIN (4 أرقام)</label><input type="text" inputmode="numeric" maxlength="6" id="employeePin" class="mono"></div>
-        <div class="field">
-            <label data-ar="الصلاحيات" data-en="Permissions">الصلاحيات</label>
-            <label style="display:flex;align-items:center;gap:8px;font-weight:500;color:var(--text);margin-bottom:6px;"><input type="checkbox" id="permStations" checked> <span data-ar="إدارة الأجهزة والجلسات" data-en="Manage devices & sessions">إدارة الأجهزة والجلسات</span></label>
-            <label style="display:flex;align-items:center;gap:8px;font-weight:500;color:var(--text);margin-bottom:6px;"><input type="checkbox" id="permShift"> <span data-ar="إقفال الشيفت" data-en="Close shift">إقفال الشيفت</span></label>
-            <label style="display:flex;align-items:center;gap:8px;font-weight:500;color:var(--text);"><input type="checkbox" id="permSettings"> <span data-ar="الدخول والتعديل في الإعدادات" data-en="Access & edit Settings">الدخول والتعديل في الإعدادات</span></label>
+    <div class="overlay" id="shiftDetailsOverlay">
+        <div class="sheet">
+            <div class="sheet-handle"></div>
+            <div class="sheet-title"><span data-ar="تفاصيل الشيفت" data-en="Shift Details">تفاصيل الشيفت</span><button class="close-x" onclick="closeSheet('shiftDetailsOverlay')"><i class="fa-solid fa-xmark"></i></button></div>
+            <div class="panel" id="shiftDetailsSummary" style="margin-bottom:14px;"></div>
         </div>
-        <p style="font-size:11.5px;color:var(--text-faint);margin-bottom:12px;" data-ar="ملاحظة أمان: الـ PIN مخزّن كنص عادي حاليًا لأن التطبيق مفيش له باك إند منفصل — مناسب لتحكم داخلي بسيط، مش بديل عن نظام مستخدمين حقيقي." data-en="Security note: PIN is stored as plain text currently as the app has no separate backend — suitable for simple internal control, not a replacement for a real user system.">
-            ملاحظة أمان: الـ PIN مخزّن كنص عادي حاليًا لأن التطبيق مفيش له باك إند منفصل — مناسب لتحكم داخلي بسيط، مش بديل عن نظام مستخدمين حقيقي.
-        </p>
-        <button class="btn btn-amber btn-block" onclick="submitEmployee()"><span data-ar="حفظ" data-en="Save">حفظ</span></button>
-        <div class="error-text" id="employeeError"></div>
     </div>
-</div>
 
-<!-- ============== CLOSE SHIFT SHEET ============== -->
-<div class="overlay" id="closeShiftOverlay">
-    <div class="sheet">
-        <div class="sheet-handle"></div>
-        <div class="sheet-title"><span data-ar="تأكيد إقفال الشيفت" data-en="Confirm Close Shift">تأكيد إقفال الشيفت</span><button class="close-x" onclick="closeSheet('closeShiftOverlay')"><i class="fa-solid fa-xmark"></i></button></div>
-        <div class="panel" id="closeShiftSummary" style="margin-bottom:14px;"></div>
-        <button class="btn btn-amber btn-block" onclick="confirmCloseShift()"><i class="fa-solid fa-lock"></i> <span data-ar="تأكيد الإقفال" data-en="Confirm Close">تأكيد الإقفال</span></button>
+    <div class="toast" id="toast"></div>
+    <div id="printArea" style="display:none;"></div>
+
+    <!-- bottom nav -->
+    <div class="bottom-nav">
+        <button class="nav-btn active" data-view="view-dashboard" onclick="navigateTo('view-dashboard')"><i class="fa-solid fa-chart-simple"></i><span data-ar="الرئيسية" data-en="Home">الرئيسية</span></button>
+        <button class="nav-btn" data-view="view-stations" onclick="navigateTo('view-stations')"><i class="fa-solid fa-gamepad"></i><span data-ar="الأجهزة" data-en="Devices">الأجهزة</span></button>
+        <button class="nav-btn" data-view="view-shift" onclick="navigateTo('view-shift')"><i class="fa-solid fa-clock"></i><span data-ar="الشيفت" data-en="Shift">الشيفت</span></button>
+        <button class="nav-btn" data-view="view-settings" onclick="navigateTo('view-settings')"><i class="fa-solid fa-gear"></i><span data-ar="الإعدادات" data-en="Settings">الإعدادات</span></button>
     </div>
-</div>
+</div> <!-- نهاية mainApp -->
 
-<div class="overlay" id="shiftDetailsOverlay">
-    <div class="sheet">
-        <div class="sheet-handle"></div>
-        <div class="sheet-title"><span data-ar="تفاصيل الشيفت" data-en="Shift Details">تفاصيل الشيفت</span><button class="close-x" onclick="closeSheet('shiftDetailsOverlay')"><i class="fa-solid fa-xmark"></i></button></div>
-        <div class="panel" id="shiftDetailsSummary" style="margin-bottom:14px;"></div>
-    </div>
-</div>
-
-<div class="toast" id="toast"></div>
-<div id="printArea" style="display:none;"></div>
-
-<!-- bottom nav -->
-<div class="bottom-nav">
-    <button class="nav-btn active" data-view="view-dashboard" onclick="navigateTo('view-dashboard')"><i class="fa-solid fa-chart-simple"></i><span data-ar="الرئيسية" data-en="Home">الرئيسية</span></button>
-    <button class="nav-btn" data-view="view-stations" onclick="navigateTo('view-stations')"><i class="fa-solid fa-gamepad"></i><span data-ar="الأجهزة" data-en="Devices">الأجهزة</span></button>
-    <button class="nav-btn" data-view="view-shift" onclick="navigateTo('view-shift')"><i class="fa-solid fa-clock"></i><span data-ar="الشيفت" data-en="Shift">الشيفت</span></button>
-    <button class="nav-btn" data-view="view-settings" onclick="navigateTo('view-settings')"><i class="fa-solid fa-gear"></i><span data-ar="الإعدادات" data-en="Settings">الإعدادات</span></button>
-</div>
 </body>
 </html>
