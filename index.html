@@ -10,7 +10,6 @@
 <script src="https://cdn.jsdelivr.net/npm/@supabase/supabase-js@2"></script>
 <link rel="stylesheet" href="style.css">
 <script src="app.js" defer></script>
-<!-- ✅ نظام التنبيهات الجديد -->
 <script src="alerts.js" defer></script>
 
 <style>
@@ -29,14 +28,32 @@
         color: var(--amber);
         opacity: 0.7;
     }
-    /* تأكد إن اللون يبقى واضح في الرأس */
     .app-header .dorak-brand {
         color: var(--amber);
     }
-    /* لو عايز تغير اللون في الوضع الفاتح */
     [data-theme="light"] .dorak-brand {
         color: var(--amber-dark);
         text-shadow: 0 0 20px rgba(255, 138, 30, 0.15);
+    }
+
+    /* ✅ تأثير الجرس في الهيدر */
+    #headerBell {
+        font-size: 20px;
+        color: var(--text-muted);
+        transition: all 0.3s ease;
+        cursor: default;
+    }
+    #headerBell.bell-ringing {
+        color: var(--amber);
+        animation: bellBlink 0.6s infinite alternate, bellShake 0.3s infinite;
+    }
+    @keyframes bellBlink {
+        0% { opacity: 0.4; transform: scale(0.9); }
+        100% { opacity: 1; transform: scale(1.1); }
+    }
+    @keyframes bellShake {
+        0% { transform: rotate(-15deg); }
+        100% { transform: rotate(15deg); }
     }
 </style>
 </head>
@@ -151,12 +168,15 @@
 <!-- ============== MAIN APP ============== -->
 <div id="mainApp" class="screen">
     <div class="app-header">
-        <div>
-            <div class="biz-name" id="headerBizName">—</div>
-            <div class="biz-sub mono" id="headerBizCode">—</div>
+        <div style="display:flex; align-items:center; gap:8px;">
+            <!-- ✅ أيقونة الجرس -->
+            <i class="fa-solid fa-bell" id="headerBell"></i>
+            <div>
+                <div class="biz-name" id="headerBizName">—</div>
+                <div class="biz-sub mono" id="headerBizCode">—</div>
+            </div>
         </div>
         <div class="header-actions">
-            <!-- ✅ اسم DORAK في أعلى اليمين (قبل الأزرار) -->
             <span class="dorak-brand">✦ DORAK ✦</span>
             <button class="lang-toggle" onclick="toggleLanguage()">
                 <i class="fa-solid fa-language"></i> <span id="langToggleLabel">English</span>
@@ -458,7 +478,7 @@
         <button class="nav-btn" data-view="view-shift" onclick="navigateTo('view-shift')"><i class="fa-solid fa-clock"></i><span data-ar="الشيفت" data-en="Shift">الشيفت</span></button>
         <button class="nav-btn" data-view="view-settings" onclick="navigateTo('view-settings')"><i class="fa-solid fa-gear"></i><span data-ar="الإعدادات" data-en="Settings">الإعدادات</span></button>
     </div>
-</div> <!-- نهاية mainApp -->
+</div>
 
 </body>
 </html>
