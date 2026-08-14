@@ -1,8 +1,8 @@
 // ============================================================
-// COUNTDOWN ALERTS - نظام التنبيهات المتقدم (نسخة Plate Pro)
+// COUNTDOWN ALERTS - نظام التنبيهات المتقدم مع جرس في الـ Header + صوت متحدث (TTS)
 // ============================================================
 
-// تخزين حالة التنبيهات لكل جهاز
+// تخزين حالة التنبيهات لكل جهاز (لمنع التكرار)
 const countdownAlertState = {};
 
 // الحد الأدنى للتنبيه (بالثواني) - 300 ثانية = 5 دقائق
@@ -16,7 +16,56 @@ let audioContext = null;
 let ringTimeout = null;
 
 // ========================
-// تهيئة الصوت
+// التحكم في أيقونة الجرس (مستقل عن حالة التنبيهات)
+// ========================
+function setBellRinging(active) {
+    const bell = document.getElementById('headerBell');
+    if (!bell) return;
+    if (active) {
+        bell.classList.add('bell-ringing');
+    } else {
+        bell.classList.remove('bell-ringing');
+    }
+}
+
+// ========================
+// 🗣️ التحدث بصوت (Text-to-Speech) بالعربية
+// ========================
+function speakAlert(message, type = 'warning') {
+    try {
+        // إيقاف أي كلام سابق
+        window.speechSynthesis.cancel();
+        
+        const utterance = new SpeechSynthesisUtterance(message);
+        utterance.lang = 'ar-EG'; // اللغة العربية المصرية
+        utterance.rate = 0.9;     // سرعة مناسبة (ليست سريعة جداً)
+        utterance.pitch = 1.0;    // نغمة طبيعية
+        utterance.volume = 1;     // أعلى صوت
+        
+        // اختيار صوت عربي إذا كان متوفراً
+        const voices = window.speechSynthesis.getVoices();
+        const arabicVoice = voices.find(v => v.lang.startsWith('ar'));
+        if (arabicVoice) {
+            utterance.voice = arabicVoice;
+        }
+        
+        window.speechSynthesis.speak(utterance);
+        console.log('🗣️ Speaking:', message);
+    } catch (e) {
+        console.warn('⚠️ Speech synthesis not supported:', e);
+    }
+}
+
+// تحميل الأصوات مسبقاً
+if (window.speechSynthesis) {
+    window.speechSynthesis.getVoices();
+    window.speechSynthesis.onvoiceschanged = () => {
+        window.speechSynthesis.getVoices();
+    };
+}
+
+// ========================
+// تهيئة الصوت (النغمات)
 // ========================
 function initAudio() {
     try {
@@ -43,7 +92,7 @@ function playRingSound(type = 'warning') {
         const now = audioContext.currentTime;
 
         if (type === 'warning') {
-            // نغمة تحذيرية (نغمتين متتاليتين)
+            // نغمة تحذيرية (نغمتين متتاليتين) - هادئة
             const frequencies = [800, 1000];
             const durations = [0.2, 0.2];
             let time = now;
@@ -54,16 +103,16 @@ function playRingSound(type = 'warning') {
                 osc.connect(gain);
                 gain.connect(audioContext.destination);
                 osc.frequency.setValueAtTime(freq, time);
-                gain.gain.setValueAtTime(0.25, time);
+                gain.gain.setValueAtTime(0.3, time);
                 gain.gain.exponentialRampToValueAtTime(0.001, time + durations[i]);
                 osc.start(time);
                 osc.stop(time + durations[i]);
                 time += durations[i] + 0.1;
             });
         } else if (type === 'ended') {
-            // نغمة انتهاء الوقت (3 نغمات متتالية)
-            const frequencies = [800, 600, 800];
-            const durations = [0.25, 0.25, 0.3];
+            // صوت انتهاء الوقت: أعلى وأوضح (3 نغمات 1000-800-1000)
+            const frequencies = [1000, 800, 1000];
+            const durations = [0.3, 0.25, 0.35];
             let time = now;
 
             frequencies.forEach((freq, i) => {
@@ -72,7 +121,7 @@ function playRingSound(type = 'warning') {
                 osc.connect(gain);
                 gain.connect(audioContext.destination);
                 osc.frequency.setValueAtTime(freq, time);
-                gain.gain.setValueAtTime(0.35, time);
+                gain.gain.setValueAtTime(0.4, time);
                 gain.gain.exponentialRampToValueAtTime(0.001, time + durations[i]);
                 osc.start(time);
                 osc.stop(time + durations[i]);
@@ -91,39 +140,60 @@ function playRingSound(type = 'warning') {
 }
 
 // ========================
-// عرض إشعار مرئي + صوت
+// عرض إشعار مرئي + صوت + كلام مسموع
 // ========================
 function showRingNotification(title, message, type = 'warning') {
-    // تشغيل الصوت
+    // 🗣️ التحدث بصوت (قبل أي شيء)
+    speakAlert(message, type);
+    
+    // تشغيل النغمة
     playRingSound(type);
 
-    // البحث عن عنصر الإشعار
+    // 🔔 تفعيل الجرس (يظهر ويتحرك)
+    setBellRinging(true);
+
+    // إلغاء أي تايمر سابق لإيقاف الجرس
+    clearTimeout(ringTimeout);
+
+    // جدولة إيقاف الجرس بعد 5 ثواني
+    ringTimeout = setTimeout(() => {
+        setBellRinging(false);
+    }, 5000);
+
+    // البحث عن عنصر الإشعار المنبثق
     const el = document.getElementById('ringNotification');
     if (!el) {
-        // إذا لم يوجد، استخدم Toast كبديل
+        // إذا لم يوجد عنصر الإشعار، استخدم Toast مع نص الكلام
         if (typeof showToast === 'function') {
-            showToast(`🔔 ${title}: ${message}`, type === 'ended' ? 'error' : 'warning');
+            showToast(`🔊 ${title}: ${message}`, type === 'ended' ? 'error' : 'warning');
         }
         return;
     }
 
-    // تحديث المحتوى
+    // تحديث محتوى الإشعار
     document.getElementById('ringTitle').textContent = title;
     document.getElementById('ringSub').textContent = message;
 
     // إظهار الإشعار
     el.classList.add('show');
 
-    // إخفاء الإشعار بعد 5 ثواني
-    clearTimeout(ringTimeout);
-    ringTimeout = setTimeout(() => {
+    // إخفاء الإشعار بعد 5 ثواني (مع إيقاف الجرس)
+    clearTimeout(el._hideTimeout);
+    el._hideTimeout = setTimeout(() => {
         el.classList.remove('show');
+        // الجرس سيتوقف بواسطة الـ timeout أعلاه
     }, 5000);
 
-    // النقر على الإشعار لإخفائه
+    // النقر على الإشعار لإخفائه فوراً وإيقاف الجرس
     el.onclick = function() {
         el.classList.remove('show');
+        clearTimeout(el._hideTimeout);
         clearTimeout(ringTimeout);
+        setBellRinging(false);
+        // إيقاف الكلام إذا كان لسه شغال
+        if (window.speechSynthesis) {
+            window.speechSynthesis.cancel();
+        }
     };
 }
 
@@ -139,14 +209,15 @@ function checkCountdownAlerts() {
     }
 
     if (Object.keys(sessions).length === 0) {
-        // إعادة ضبط حالة التنبيهات عند عدم وجود جلسات
+        // مسح حالة التنبيهات عند عدم وجود جلسات
         for (const key in countdownAlertState) {
             delete countdownAlertState[key];
         }
+        // إذا لم توجد جلسات، نطفئ الجرس (احتياطي)
+        setBellRinging(false);
         return;
     }
 
-    // التأكد من توفر الدوال المساعدة من app.js
     if (typeof getActiveSegmentFast !== 'function' || typeof getRemainingSeconds !== 'function') {
         console.warn('⚠️ Alert functions not available yet');
         return;
@@ -164,7 +235,6 @@ function checkCountdownAlerts() {
         const deviceName = station ? (station.name || t('جهاز', 'Device') + ' ' + station.number) : t('جهاز', 'Device');
 
         if (remaining <= 0) {
-            // انتهى الوقت
             if (countdownAlertState[stationId] !== 'ended') {
                 countdownAlertState[stationId] = 'ended';
                 const msg = t(`⏰ انتهى وقت جهاز ${deviceName}`, `⏰ Time's up for device ${deviceName}`);
@@ -173,13 +243,11 @@ function checkCountdownAlerts() {
                     msg,
                     'ended'
                 );
-                // استخدام Toast أيضاً للتأكيد
                 if (typeof showToast === 'function') {
                     showToast(msg, 'error');
                 }
             }
         } else if (remaining <= ALERT_THRESHOLD) {
-            // باقي وقت قليل
             if (countdownAlertState[stationId] !== 'warning') {
                 countdownAlertState[stationId] = 'warning';
                 const minutes = Math.floor(remaining / 60);
@@ -202,7 +270,6 @@ function checkCountdownAlerts() {
                 }
             }
         } else {
-            // أكثر من الحد، إعادة ضبط الحالة
             if (countdownAlertState[stationId]) {
                 delete countdownAlertState[stationId];
             }
@@ -219,7 +286,7 @@ function startCountdownAlerts() {
         countdownAlertInterval = null;
     }
     countdownAlertInterval = setInterval(checkCountdownAlerts, 1000);
-    console.log('🔔 Countdown alerts started (Ring system)');
+    console.log('🔔 Countdown alerts started (Ring + Speech)');
 }
 
 function stopCountdownAlerts() {
@@ -228,30 +295,31 @@ function stopCountdownAlerts() {
         countdownAlertInterval = null;
         console.log('🔕 Countdown alerts stopped');
     }
+    setBellRinging(false);
+    clearTimeout(ringTimeout);
+    // إيقاف الكلام
+    if (window.speechSynthesis) {
+        window.speechSynthesis.cancel();
+    }
 }
 
 // ========================
 // التهيئة التلقائية عند تحميل الصفحة
 // ========================
 function initAlerts() {
-    // ننتظر حتى تتوفر البيانات الأساسية
     if (typeof business !== 'undefined' && business &&
         typeof stations !== 'undefined' && stations && stations.length > 0) {
         startCountdownAlerts();
     } else {
-        // نعيد المحاولة بعد 500 مللي ثانية
         setTimeout(initAlerts, 500);
     }
 }
 
-// بدء المراقبة بعد تحميل الصفحة
 window.addEventListener('load', initAlerts);
 
-// إيقاف المراقبة عند إغلاق الصفحة
 window.addEventListener('beforeunload', function() {
     stopCountdownAlerts();
 });
 
-// التصدير للاستخدام الخارجي (اختياري)
 window.startCountdownAlerts = startCountdownAlerts;
 window.stopCountdownAlerts = stopCountdownAlerts;
