@@ -1,0 +1,18 @@
+# DORAK - Gaming Lounge Management System
+# Allow all bots to crawl the main pages
+User-agent: *
+Allow: /
+
+# Protect admin and private pages
+Disallow: /admin.html
+Disallow: /dashboard.html
+Disallow: /login.html
+Disallow: /register.html
+Disallow: /reset-password.html
+
+# Block sensitive paths
+Disallow: /api/
+Disallow: /supabase/
+
+# Sitemap location
+Sitemap: https://dorak-six.vercel.app/sitemap.xml
