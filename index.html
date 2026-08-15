@@ -13,7 +13,7 @@
 <script src="alerts.js" defer></script>
 
 <style>
-    /* ✅ إضافة لـ DORAK Brand في الرأس */
+    /* ✅ DORAK Brand في الرأس */
     .dorak-brand {
         font-family: 'JetBrains Mono', monospace;
         font-weight: 800;
@@ -36,12 +36,13 @@
         text-shadow: 0 0 20px rgba(255, 138, 30, 0.15);
     }
 
-    /* ✅ تأثير الجرس في الهيدر */
+    /* ✅ الجرس الموحد بجانب الاسم */
     #headerBell {
         font-size: 20px;
-        color: var(--text-muted);
+        color: var(--text-dim);
         transition: all 0.3s ease;
         cursor: default;
+        margin-left: 8px;
     }
     #headerBell.bell-ringing {
         color: var(--amber);
@@ -54,6 +55,11 @@
     @keyframes bellShake {
         0% { transform: rotate(-15deg); }
         100% { transform: rotate(15deg); }
+    }
+
+    /* ✅ تحريك الجرس عند الرنين */
+    .bell-ringing {
+        animation: bellShake 0.3s infinite, bellBlink 0.6s infinite alternate;
     }
 </style>
 </head>
@@ -85,8 +91,45 @@
             <button class="btn btn-amber btn-block" id="setupContinueBtn" onclick="handleSetupContinue()">
                 <i class="fa-solid fa-arrow-left"></i> <span data-ar="متابعة" data-en="Continue">متابعة</span>
             </button>
+            <!-- ✅ زر إنشاء نشاط جديد -->
+            <button class="btn btn-ghost btn-block" style="margin-top: 8px;" onclick="openCreateBusinessSheetFromSetup()">
+                <i class="fa-solid fa-plus"></i> <span data-ar="إنشاء نشاط جديد" data-en="Create New Business">إنشاء نشاط جديد</span>
+            </button>
             <div class="error-text" id="setupError"></div>
         </div>
+    </div>
+</div>
+
+<!-- ============== CREATE BUSINESS SHEET (من صفحة الدخول) ============== -->
+<div class="overlay" id="createBusinessSheetFromSetup">
+    <div class="sheet">
+        <div class="sheet-handle"></div>
+        <div class="sheet-title">
+            <span data-ar="إنشاء نشاط تجاري جديد" data-en="Create New Business">إنشاء نشاط تجاري جديد</span>
+            <button class="close-x" onclick="closeSheet('createBusinessSheetFromSetup')"><i class="fa-solid fa-xmark"></i></button>
+        </div>
+        <div class="field">
+            <label data-ar="كود النشاط (بالإنجليزي، بدون مسافات)" data-en="Business Code (English, no spaces)">كود النشاط</label>
+            <input type="text" id="newBizCodeSetup" class="mono" style="text-transform:uppercase" placeholder="CAFE01">
+        </div>
+        <div class="field">
+            <label data-ar="اسم النشاط" data-en="Business Name">اسم النشاط</label>
+            <input type="text" id="newBizNameSetup" placeholder="اسم المحل">
+        </div>
+        <div class="field">
+            <label data-ar="رقم تليفون (اختياري)" data-en="Phone (optional)">رقم تليفون</label>
+            <input type="text" id="newBizPhoneSetup" class="mono">
+        </div>
+        <div class="field">
+            <label data-ar="عدد الأجهزة" data-en="Number of Devices">عدد الأجهزة</label>
+            <input type="number" id="newBizStationsSetup" class="mono" value="4">
+        </div>
+        <!-- ✅ PIN المالك ثابت = 0000 -->
+        <input type="hidden" id="newBizPinSetup" value="0000">
+        <button class="btn btn-amber btn-block" onclick="submitCreateBusinessFromSetup()">
+            <i class="fa-solid fa-check"></i> <span data-ar="إنشاء" data-en="Create">إنشاء</span>
+        </button>
+        <div class="error-text" id="createBizErrorSetup"></div>
     </div>
 </div>
 
@@ -133,7 +176,6 @@
                 <div class="field">
                     <label data-ar="PIN المالك" data-en="Owner PIN">PIN المالك</label>
                     <input type="password" inputmode="numeric" id="lockPinInput" class="mono" placeholder="••••" style="text-align:center;letter-spacing:0.4em;font-size:22px;">
-                    <div style="font-size:11px;color:var(--text-faint);margin-top:6px;text-align:center;" data-ar="الـ PIN الافتراضي هو 0000" data-en="Default PIN is 0000">الـ PIN الافتراضي هو 0000</div>
                 </div>
                 <button class="btn btn-amber btn-block" onclick="handleUnlock()">
                     <i class="fa-solid fa-unlock"></i> <span data-ar="دخول" data-en="Enter">دخول</span>
@@ -170,7 +212,7 @@
 <div id="mainApp" class="screen">
     <div class="app-header">
         <div style="display:flex; align-items:center; gap:8px;">
-            <!-- ✅ أيقونة الجرس -->
+            <!-- ✅ الجرس الموحد بجانب الاسم -->
             <i class="fa-solid fa-bell" id="headerBell"></i>
             <div>
                 <div class="biz-name" id="headerBizName">—</div>
@@ -246,12 +288,15 @@
 
     <!-- ---------- SETTINGS ---------- -->
     <div class="view" id="view-settings">
+        
+        <!-- ✅ الأجهزة (قابلة للطي) -->
         <div class="section-title" style="cursor:pointer;display:flex;align-items:center;justify-content:space-between;" onclick="toggleSettingsStations()">
             <span><span data-ar="الأجهزة" data-en="Devices">الأجهزة</span> <span id="settingsStationsCount" class="mono" style="color:var(--text-dim);font-weight:400;font-size:12px;"></span></span>
             <i class="fa-solid fa-chevron-down" id="settingsStationsChevron" style="transition:transform .2s;"></i>
         </div>
         <div class="panel" id="settingsStations" style="display:none;"></div>
         
+        <!-- ✅ تحديث الأسعار الجماعية -->
         <div class="panel" style="margin-top:8px;">
             <div style="display:grid;grid-template-columns:1fr 1fr;gap:8px;margin-bottom:8px;">
                 <input type="number" id="bulkSingleRateInput" class="mono" placeholder="سعر Single (ج/ساعة)" style="width:100%;box-sizing:border-box;background:var(--bg);border:1px solid var(--border);color:var(--text);border-radius:8px;padding:10px;">
@@ -264,21 +309,46 @@
         </div>
         <button class="btn btn-ghost btn-block" style="margin-top:8px;" onclick="openStationManagementSheet()"><i class="fa-solid fa-plus"></i> <span data-ar="إضافة جهاز" data-en="Add Device">إضافة جهاز</span></button>
 
+        <!-- ✅ طرق الدفع -->
         <div class="section-title" data-ar="طرق الدفع" data-en="Payment Methods">طرق الدفع</div>
         <div class="panel" id="settingsPaymentMethods"></div>
         <button class="btn btn-ghost btn-block" style="margin-top:8px;" onclick="openPaymentMethodSheet()"><i class="fa-solid fa-plus"></i> <span data-ar="إضافة طريقة دفع" data-en="Add Payment Method">إضافة طريقة دفع</span></button>
 
+        <!-- ✅ الاشتراك -->
         <div class="section-title" data-ar="الاشتراك" data-en="Subscription">الاشتراك</div>
         <div class="panel" id="settingsSubscription"></div>
 
+        <!-- ✅ قائمة الأكل والمشروبات -->
         <div class="section-title" data-ar="قائمة الأكل والمشروبات" data-en="Food & Drinks Menu">قائمة الأكل والمشروبات</div>
         <div class="panel" id="settingsMenu"></div>
         <button class="btn btn-ghost btn-block" style="margin-top:8px;" onclick="openMenuItemSheet()"><i class="fa-solid fa-plus"></i> <span data-ar="إضافة صنف" data-en="Add Item">إضافة صنف</span></button>
 
+        <!-- ✅ الموظفين -->
         <div class="section-title" data-ar="الموظفين" data-en="Employees">الموظفين</div>
         <div class="panel" id="settingsEmployees"></div>
         <button class="btn btn-ghost btn-block" style="margin-top:8px;" onclick="openEmployeeSheet()"><i class="fa-solid fa-plus"></i> <span data-ar="إضافة موظف" data-en="Add Employee">إضافة موظف</span></button>
 
+        <!-- ✅ تغيير PIN المالك (Toggle - قابل للطي) -->
+        <div class="section-title" style="cursor:pointer;display:flex;align-items:center;justify-content:space-between;margin-top:20px;" onclick="toggleSettingsPin()">
+            <span><i class="fa-solid fa-key" style="color:var(--amber);margin-left:8px;"></i> <span data-ar="تغيير PIN المالك" data-en="Change Owner PIN">تغيير PIN المالك</span></span>
+            <i class="fa-solid fa-chevron-down" id="settingsPinChevron" style="transition:transform .2s;"></i>
+        </div>
+        <div class="panel" id="settingsChangePin" style="display:none;margin-bottom:8px;">
+            <div class="field">
+                <label data-ar="PIN الحالي" data-en="Current PIN">PIN الحالي</label>
+                <input type="password" id="currentPinInput" class="mono" maxlength="6" placeholder="••••">
+            </div>
+            <div class="field">
+                <label data-ar="PIN الجديد (4-6 أرقام)" data-en="New PIN (4-6 digits)">PIN الجديد</label>
+                <input type="password" id="newPinInput" class="mono" maxlength="6" placeholder="••••••">
+            </div>
+            <button class="btn btn-amber btn-block" onclick="changeOwnerPin()">
+                <i class="fa-solid fa-key"></i> <span data-ar="تغيير PIN" data-en="Change PIN">تغيير PIN</span>
+            </button>
+            <div class="error-text" id="changePinError"></div>
+        </div>
+
+        <!-- ✅ النشاط (تبديل النشاط) -->
         <div class="section-title" data-ar="النشاط" data-en="Business">النشاط</div>
         <button class="btn btn-ghost btn-block" onclick="switchBusiness()"><i class="fa-solid fa-right-left"></i> <span data-ar="تبديل النشاط" data-en="Switch Business">تبديل النشاط</span></button>
     </div>
