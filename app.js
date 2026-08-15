@@ -122,6 +122,7 @@ let activeSessionOrders = [];
 let currentOrderSessionId = null;
 let selectedPaymentMethod = null;
 let endSessionStationId = null;
+let endingSessionInProgress = false;
 let sessionSegmentsCache = {};
 let activeSegmentCache = {};
 let pendingSwitch = false;
@@ -130,6 +131,24 @@ let countdownTimers = {};
 let countdownAlerts = {};
 // تخزين حالة التوجل لكل تصنيف
 let categoryToggleState = {};
+
+// ============================================================
+// ✅ TOGGLE PIN SECTION (قابل للطي)
+// ============================================================
+let settingsPinExpanded = false;
+
+function toggleSettingsPin() {
+    settingsPinExpanded = !settingsPinExpanded;
+    const pinSection = document.getElementById('settingsChangePin');
+    const chevron = document.getElementById('settingsPinChevron');
+    
+    if (pinSection) {
+        pinSection.style.display = settingsPinExpanded ? 'block' : 'none';
+    }
+    if (chevron) {
+        chevron.style.transform = settingsPinExpanded ? 'rotate(180deg)' : 'rotate(0deg)';
+    }
+}
 
 // ============================================================
 // UTILITIES
@@ -171,6 +190,7 @@ function closeSheet(id) {
     if (id === 'stationOverlay') {
         activeStationId = null;
         sessionSegmentsCache = {};
+        endingSessionInProgress = false;
     }
     if (id === 'transferOverlay') {
         transferSourceStationId = null;
@@ -796,7 +816,7 @@ function handleSessionChange(payload) {
     renderStationsGrid();
     if (document.getElementById('view-dashboard').classList.contains('active')) renderDashboard();
     if (document.getElementById('view-shift').classList.contains('active')) renderShiftView();
-    if (activeStationId === row.station_id && !pendingSwitch) openStationSheet(activeStationId);
+    if (activeStationId === row.station_id && !pendingSwitch && !endingSessionInProgress) openStationSheet(activeStationId);
 }
 
 function handleOrderChange(payload) {
@@ -816,7 +836,7 @@ function handleSegmentChange(payload) {
         const row = payload.new;
         sessionSegmentsCache[row.session_id] = null;
         activeSegmentCache[row.session_id] = row.ended_at ? null : row;
-        if (activeStationId && !pendingSwitch) {
+        if (activeStationId && !pendingSwitch && !endingSessionInProgress) {
             const session = sessions[activeStationId];
             if (session && session.id === row.session_id) {
                 openStationSheet(activeStationId);
@@ -1649,6 +1669,8 @@ async function executeCancelSession(stationId) {
         return;
     }
     
+    endingSessionInProgress = true;
+    
     try {
         const activeSeg = await getActiveSegment(session.id);
         if (activeSeg && !activeSeg.ended_at) {
@@ -1678,6 +1700,7 @@ async function executeCancelSession(stationId) {
         showToast(t('تم إلغاء الجلسة', 'Session cancelled'), 'warning');
     } catch (e) {
         console.error('Error cancelling session:', e);
+        endingSessionInProgress = false;
         showToast(t('فشل إلغاء الجلسة: ' + e.message, 'Failed to cancel session: ' + e.message), 'error');
     }
 }
@@ -2100,13 +2123,14 @@ async function startSessionWithMode(stationId) {
 }
 
 // ============================================================
-// END SESSION WITH PAYMENT
+// END SESSION WITH PAYMENT - من الملف الشغال
 // ============================================================
 function showEndSessionPayment(stationId) {
     endSessionStationId = stationId;
     activeStationId = stationId;
+    endingSessionInProgress = true;
     const session = sessions[stationId];
-    if (!session) return;
+    if (!session) { endingSessionInProgress = false; return; }
 
     (async () => {
         const activeSeg = await getActiveSegment(session.id);
@@ -2116,14 +2140,11 @@ function showEndSessionPayment(stationId) {
             let hours = Math.max(0, (new Date(now) - start) / 3600000);
             let amount = Math.round((hours * Number(activeSeg.rate)) * 100) / 100;
             
-            let remainingSeconds = 0;
             if (activeSeg.timer_type === 'countdown' && activeSeg.duration_seconds) {
                 const elapsedSeconds = (new Date(now) - start) / 1000;
                 const usedSeconds = Math.min(elapsedSeconds, activeSeg.duration_seconds);
                 hours = usedSeconds / 3600;
                 amount = Math.round((hours * Number(activeSeg.rate)) * 100) / 100;
-                remainingSeconds = Math.max(0, activeSeg.duration_seconds - usedSeconds);
-                session._pausedRemaining = remainingSeconds;
             }
             
             await closeSegment(activeSeg.id, now, amount);
@@ -2217,8 +2238,9 @@ function showEndSessionPayment(stationId) {
     })();
 }
 
+
 // ============================================================
-// SELECT PAYMENT METHOD
+// SELECT PAYMENT METHOD - من الملف الشغال
 // ============================================================
 function selectPaymentMethod(pmId) {
     selectedPaymentMethod = pmId;
@@ -2245,10 +2267,11 @@ function selectPaymentMethod(pmId) {
 }
 
 // ============================================================
-// CANCEL END SESSION (Back button)
+// CANCEL END SESSION (Back button) - من الملف الشغال
 // ============================================================
 function cancelEndSession() {
     const stationId = endSessionStationId || activeStationId;
+    endingSessionInProgress = false;
     if (stationId) {
         closeSheet('stationOverlay');
         setTimeout(() => {
@@ -2257,6 +2280,75 @@ function cancelEndSession() {
     } else {
         closeSheet('stationOverlay');
         navigateTo('view-stations');
+    }
+}
+
+// ============================================================
+// CONFIRM END SESSION WITH PAYMENT - من الملف الشغال
+// ============================================================
+async function confirmEndSessionWithPayment() {
+    if (!selectedPaymentMethod) {
+        document.getElementById('endSessionError').textContent = t('اختر طريقة دفع أولاً.', 'Select a payment method first.');
+        return;
+    }
+    const stationId = endSessionStationId;
+    const session = sessions[stationId];
+    if (!session) return;
+
+    try {
+        const activeSeg = await getActiveSegment(session.id);
+        if (activeSeg && !activeSeg.ended_at) {
+            const now = new Date().toISOString();
+            const start = new Date(activeSeg.started_at);
+            let hours = Math.max(0, (new Date(now) - start) / 3600000);
+            let amount = Math.round((hours * Number(activeSeg.rate)) * 100) / 100;
+            
+            if (activeSeg.timer_type === 'countdown' && activeSeg.duration_seconds) {
+                const elapsedSeconds = (new Date(now) - start) / 1000;
+                const usedSeconds = Math.min(elapsedSeconds, activeSeg.duration_seconds);
+                hours = usedSeconds / 3600;
+                amount = Math.round((hours * Number(activeSeg.rate)) * 100) / 100;
+            }
+            
+            await closeSegment(activeSeg.id, now, amount);
+        }
+
+        const totals = await calculateTotalAmounts(session.id);
+        
+        const { error } = await supabaseClient.from('sessions').update({
+            status: 'completed',
+            ended_at: new Date().toISOString(),
+            amount: totals.grandTotal,
+            payment_method: selectedPaymentMethod
+        }).eq('id', session.id);
+        
+        if (error) {
+            console.error('Error ending session:', error);
+            endingSessionInProgress = false;
+            showToast(t('فشل إنهاء الجلسة: ' + error.message, 'Failed to end session: ' + error.message), 'error');
+            return;
+        }
+        
+        const savedStationId = stationId;
+        
+        delete sessions[stationId];
+        renderStationsGrid();
+        closeSheet('stationOverlay');
+        const pm = paymentMethods.find(p => p.id === selectedPaymentMethod);
+        showToast(`${t('اتقفلت الجلسة —', 'Session closed —')} ${moneyDec(totals.grandTotal)} ${t('ج', 'EGP')} (${pm ? pm.name : ''})`, 'success');
+        
+        await renderDashboard();
+        if (document.getElementById('view-shift').classList.contains('active')) {
+            await renderShiftView();
+        }
+        
+        setTimeout(() => {
+            printReceipt();
+        }, 500);
+    } catch (e) {
+        console.error('Error in confirmEndSessionWithPayment:', e);
+        endingSessionInProgress = false;
+        showToast(t('حصل خطأ، حاول تاني.', 'Error, try again.'), 'error');
     }
 }
 
@@ -2404,73 +2496,6 @@ function printReceipt() {
         `);
         printWindow.document.close();
     });
-}
-
-// ============================================================
-// CONFIRM END SESSION WITH PAYMENT
-// ============================================================
-async function confirmEndSessionWithPayment() {
-    if (!selectedPaymentMethod) {
-        document.getElementById('endSessionError').textContent = t('اختر طريقة دفع أولاً.', 'Select a payment method first.');
-        return;
-    }
-    const stationId = endSessionStationId;
-    const session = sessions[stationId];
-    if (!session) return;
-
-    try {
-        const activeSeg = await getActiveSegment(session.id);
-        if (activeSeg && !activeSeg.ended_at) {
-            const now = new Date().toISOString();
-            const start = new Date(activeSeg.started_at);
-            let hours = Math.max(0, (new Date(now) - start) / 3600000);
-            let amount = Math.round((hours * Number(activeSeg.rate)) * 100) / 100;
-            
-            if (activeSeg.timer_type === 'countdown' && activeSeg.duration_seconds) {
-                const elapsedSeconds = (new Date(now) - start) / 1000;
-                const usedSeconds = Math.min(elapsedSeconds, activeSeg.duration_seconds);
-                hours = usedSeconds / 3600;
-                amount = Math.round((hours * Number(activeSeg.rate)) * 100) / 100;
-            }
-            
-            await closeSegment(activeSeg.id, now, amount);
-        }
-
-        const totals = await calculateTotalAmounts(session.id);
-        
-        const { error } = await supabaseClient.from('sessions').update({
-            status: 'completed',
-            ended_at: new Date().toISOString(),
-            amount: totals.grandTotal,
-            payment_method: selectedPaymentMethod
-        }).eq('id', session.id);
-        
-        if (error) {
-            console.error('Error ending session:', error);
-            showToast(t('فشل إنهاء الجلسة: ' + error.message, 'Failed to end session: ' + error.message), 'error');
-            return;
-        }
-        
-        const savedStationId = stationId;
-        
-        delete sessions[stationId];
-        renderStationsGrid();
-        closeSheet('stationOverlay');
-        const pm = paymentMethods.find(p => p.id === selectedPaymentMethod);
-        showToast(`${t('اتقفلت الجلسة —', 'Session closed —')} ${moneyDec(totals.grandTotal)} ${t('ج', 'EGP')} (${pm ? pm.name : ''})`, 'success');
-        
-        await renderDashboard();
-        if (document.getElementById('view-shift').classList.contains('active')) {
-            await renderShiftView();
-        }
-        
-        setTimeout(() => {
-            printReceipt();
-        }, 500);
-    } catch (e) {
-        console.error('Error in confirmEndSessionWithPayment:', e);
-        showToast(t('حصل خطأ، حاول تاني.', 'Error, try again.'), 'error');
-    }
 }
 
 // ============================================================
@@ -2869,6 +2894,116 @@ function renderSettings() {
                     </button>
                 </div>
             </div>`).join('');
+    
+    // ✅ تحديث حالة الـ Toggle (PIN)
+    const pinSection = document.getElementById('settingsChangePin');
+    const chevron = document.getElementById('settingsPinChevron');
+    if (pinSection && chevron) {
+        pinSection.style.display = settingsPinExpanded ? 'block' : 'none';
+        chevron.style.transform = settingsPinExpanded ? 'rotate(180deg)' : 'rotate(0deg)';
+    }
+}
+
+// ============================================================
+// 🔐 تغيير PIN المالك (جديد)
+// ============================================================
+async function changeOwnerPin() {
+    const currentPin = document.getElementById('currentPinInput').value.trim();
+    const newPin = document.getElementById('newPinInput').value.trim();
+    const errEl = document.getElementById('changePinError');
+    errEl.textContent = '';
+
+    if (!business) { 
+        errEl.textContent = t('❌ النشاط غير موجود.', '❌ Business not found.'); 
+        return; 
+    }
+    
+    // 🔍 التحقق من PIN الحالي
+    if (currentPin !== business.owner_pin) { 
+        errEl.textContent = t('❌ PIN الحالي غير صحيح.', '❌ Current PIN is incorrect.'); 
+        return; 
+    }
+    
+    // ✅ التحقق من PIN الجديد
+    if (!/^\d{4,6}$/.test(newPin)) { 
+        errEl.textContent = t('❌ PIN الجديد لازم يكون 4-6 أرقام.', '❌ New PIN must be 4-6 digits.'); 
+        return; 
+    }
+
+    try {
+        const { error } = await supabaseClient
+            .from('businesses')
+            .update({ owner_pin: newPin })
+            .eq('id', business.id);
+        
+        if (error) throw error;
+
+        // ✅ تحديث المتغير المحلي
+        business.owner_pin = newPin;
+        
+        // 🧹 تنظيف الحقول
+        document.getElementById('currentPinInput').value = '';
+        document.getElementById('newPinInput').value = '';
+        
+        showToast(t('✅ تم تغيير PIN المالك بنجاح.', '✅ Owner PIN changed successfully.'), 'success');
+    } catch (e) {
+        console.error('❌ Error changing PIN:', e);
+        errEl.textContent = t('❌ فشل تغيير PIN: ' + e.message, '❌ Failed to change PIN: ' + e.message);
+    }
+}
+
+// ============================================================
+// 🏢 إنشاء نشاط جديد من صفحة الدخول (جديد)
+// ============================================================
+function openCreateBusinessSheetFromSetup() {
+    ['newBizCodeSetup', 'newBizNameSetup', 'newBizPhoneSetup'].forEach(id => document.getElementById(id).value = '');
+    document.getElementById('newBizStationsSetup').value = 4;
+    document.getElementById('createBizErrorSetup').textContent = '';
+    openSheet('createBusinessSheetFromSetup');
+}
+
+async function submitCreateBusinessFromSetup() {
+    const code = document.getElementById('newBizCodeSetup').value.trim().toUpperCase();
+    const name = document.getElementById('newBizNameSetup').value.trim();
+    const phone = document.getElementById('newBizPhoneSetup').value.trim();
+    const total_stations = parseInt(document.getElementById('newBizStationsSetup').value) || 4;
+    const owner_pin = '0000'; // ✅ PIN افتراضي
+    const err = document.getElementById('createBizErrorSetup');
+
+    if (!code || !name) { 
+        err.textContent = t('❌ اكتب الكود والاسم.', '❌ Enter code and name.'); 
+        return; 
+    }
+
+    try {
+        const { error } = await supabaseClient.from('businesses').insert({ 
+            code, 
+            name, 
+            phone: phone || null, 
+            owner_pin, 
+            total_stations 
+        });
+        
+        if (error) {
+            if (error.code === '23505') {
+                err.textContent = t('❌ الكود ده مستخدم قبل كده.', '❌ Code already used.');
+            } else {
+                err.textContent = t('❌ فشل الإنشاء، حاول تاني.', '❌ Creation failed, try again.');
+            }
+            console.error('❌ Create business error:', error);
+            return;
+        }
+        
+        closeSheet('createBusinessSheetFromSetup');
+        showToast(t('✅ تم إنشاء النشاط! استخدم الكود لتسجيل الدخول.', '✅ Business created! Use the code to login.'), 'success');
+        
+        // 🚀 محاولة الدخول التلقائي
+        document.getElementById('setupBusinessCode').value = code;
+        handleSetupContinue();
+    } catch (e) {
+        console.error('❌ Error creating business:', e);
+        err.textContent = t('❌ حصل خطأ، حاول تاني.', '❌ Error, try again.');
+    }
 }
 
 function openMenuItemSheet() {
