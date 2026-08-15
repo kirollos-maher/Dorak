@@ -252,10 +252,11 @@ async function handleActivateDevice() {
         if (error || !actCode) { errEl.textContent = t('الكود غير صحيح أو مستخدم قبل كده.', 'Invalid or already used code.'); return; }
 
         const deviceId = getDeviceId();
-        const expiry = new Date(); expiry.setDate(expiry.getDate() + 30);
+        const isTrial = actCode.is_trial === true;
+        const expiry = new Date(); expiry.setDate(expiry.getDate() + (isTrial ? 7 : 30));
         const { data: newDev, error: devErr } = await supabaseClient.from('devices').insert({
             business_id: business.id, device_id: deviceId,
-            device_label: t('جهاز بدون اسم', 'Unnamed device'),
+            device_label: isTrial ? t('جهاز — تجربة مجانية', 'Device — Free trial') : t('جهاز بدون اسم', 'Unnamed device'),
             is_active: true, revoked: false, expiry_date: expiry.toISOString()
         }).select().single();
         if (devErr) { errEl.textContent = t('فشل التفعيل، حاول تاني.', 'Activation failed, try again.'); return; }
@@ -370,7 +371,42 @@ async function tryAutoResume() {
         proceedToLock();
     } catch (e) { console.warn('auto-resume failed', e); }
 }
-window.addEventListener('DOMContentLoaded', () => { tryAutoResume(); });
+
+// ============================================================
+// AUTO-ACTIVATE FROM URL (?biz=CODE&code=ACTIVATION)
+// Used by the "start free trial" button on the marketing/dashboard
+// site, which creates a business + trial activation code and sends
+// the device straight here. Only runs for a device with no existing
+// saved session, so it never hijacks an already-installed device.
+// ============================================================
+async function tryAutoActivateFromURL() {
+    if (localStorage.getItem('psr_business_code')) return; // existing device — don't interfere
+    const params = new URLSearchParams(window.location.search);
+    const bizCode = params.get('biz');
+    const actCodeParam = params.get('code');
+    if (!bizCode) return;
+
+    // Clean the URL so a refresh/share doesn't re-trigger this.
+    window.history.replaceState({}, document.title, window.location.pathname);
+
+    const setupInput = document.getElementById('setupBusinessCode');
+    if (setupInput) setupInput.value = bizCode;
+    await handleSetupContinue();
+
+    // If handleSetupContinue routed us to the activation screen (new device)
+    // and we have an activation code, fill it in and submit automatically.
+    const activationScreen = document.getElementById('activationScreen');
+    if (actCodeParam && activationScreen && activationScreen.classList.contains('active')) {
+        const actInput = document.getElementById('activationCodeInput');
+        if (actInput) actInput.value = actCodeParam;
+        await handleActivateDevice();
+    }
+}
+
+window.addEventListener('DOMContentLoaded', async () => {
+    await tryAutoActivateFromURL();
+    tryAutoResume();
+});
 
 // ============================================================
 // MAIN APP ENTRY
